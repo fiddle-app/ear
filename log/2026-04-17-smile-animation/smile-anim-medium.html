@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Smile Animation — Medium Arc</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #1a1612;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    gap: 56px;
+    padding: 48px 24px;
+    font-family: 'Inter', system-ui, sans-serif;
+    color: #e8d5b0;
+  }
+
+  h1 {
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    opacity: 0.35;
+    font-weight: 400;
+  }
+
+  /* ── one demo section ── */
+  .demo {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+  }
+
+  .demo-label {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    opacity: 0.35;
+    font-weight: 400;
+  }
+
+  .progress-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    /* enough vertical room for the arc to breathe */
+    height: 60px;
+  }
+
+  .prog-slot {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* transition is set inline per-slot for the stagger */
+  }
+
+  /* ── controls ── */
+  .controls {
+    display: flex;
+    gap: 14px;
+    margin-top: 8px;
+  }
+
+  button {
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.16);
+    color: #e8d5b0;
+    font-size: 12px;
+    letter-spacing: 0.07em;
+    padding: 7px 18px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  button:hover { background: rgba(255,255,255,0.13); }
+  button:active { transform: scale(0.96); }
+
+  .all-btn {
+    margin-top: -28px;
+    padding: 9px 26px;
+    font-size: 13px;
+    background: rgba(100,232,130,0.10);
+    border-color: rgba(100,232,130,0.28);
+    color: #90eeaa;
+  }
+</style>
+</head>
+<body>
+
+<h1>Smile Arc — Medium (12 px) · sqrt curve</h1>
+
+<button class="all-btn" onclick="triggerAll()">Trigger All</button>
+
+<!-- 5 circles -->
+<div class="demo">
+  <div class="demo-label">5 circles</div>
+  <div class="progress-row" id="row5"></div>
+  <div class="controls">
+    <button onclick="smile('row5')">Smile</button>
+    <button onclick="reset('row5')">Reset</button>
+  </div>
+</div>
+
+<!-- 4 circles -->
+<div class="demo">
+  <div class="demo-label">4 circles</div>
+  <div class="progress-row" id="row4"></div>
+  <div class="controls">
+    <button onclick="smile('row4')">Smile</button>
+    <button onclick="reset('row4')">Reset</button>
+  </div>
+</div>
+
+<!-- 3 circles -->
+<div class="demo">
+  <div class="demo-label">3 circles</div>
+  <div class="progress-row" id="row3"></div>
+  <div class="controls">
+    <button onclick="smile('row3')">Smile</button>
+    <button onclick="reset('row3')">Reset</button>
+  </div>
+</div>
+
+<script>
+// ── SVG templates ──────────────────────────────────────────────
+
+function checkSVG() {
+  return `<svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+    <circle cx="14" cy="14" r="12"
+      fill="rgba(60,200,80,0.25)"
+      stroke="rgba(80,220,100,0.70)"
+      stroke-width="1.5"/>
+    <path d="M8 14 L12 18 L20 10"
+      stroke="#6fe882" stroke-width="2.5"
+      stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+}
+
+// ── Arc offset calculation ─────────────────────────────────────
+//
+// Uses a sqrt curve so midpoints land at ~70% of maxLift.
+// That gives a visually smooth arc rather than a V.
+//
+// dist_normalized = |i - center| / maxDist  → 0 at center, 1 at edges
+// offset = -maxLift * sqrt(dist_normalized)
+//
+// For n=5, maxLift=12:  [ -12, -8.5, 0, -8.5, -12 ]
+// For n=4, maxLift=12:  [ -12, -6.9, -6.9, -12 ]
+// For n=3, maxLift=12:  [ -12, 0, -12 ]
+
+const MAX_LIFT = 12; // px — corners rise this far above center
+
+const CENTER_DROOP_3 = 2; // px — center sags down to signal curvature for 3 circles
+
+function arcOffset(i, n) {
+  const center  = (n - 1) / 2;
+  const maxDist = center;
+  if (maxDist === 0) return 0;
+
+  // 3-circle center: explicit droop
+  if (n === 3 && i === 1) return CENTER_DROOP_3;
+
+  const distNorm = Math.abs(i - center) / maxDist; // 0..1
+
+  // n=5: sqrt produces unequal steps (3.5px then 8.5px toward center) — reads as a V.
+  //       Linear (power=1) gives equal 6px steps: [-12, -6, 0, -6, -12].
+  // n=4: sqrt gives [-12, -7, -7, -12] which looks correct — keep it.
+  const power = (n === 5) ? 1.0 : 0.5;
+  return -MAX_LIFT * Math.pow(distNorm, power);
+}
+
+// ── Stagger delays (ms) — outer slots animate slightly after center ──
+// Creates a ripple that flows outward, not all at once.
+
+function staggerDelay(i, n) {
+  const center  = (n - 1) / 2;
+  const distNorm = Math.abs(i - center) / (center || 1);
+  // outer circles lag by up to 80ms
+  return Math.round(distNorm * 80);
+}
+
+// ── Build a row of n slots ─────────────────────────────────────
+
+function buildRow(id, n) {
+  const row = document.getElementById(id);
+  row.innerHTML = '';
+  for (let i = 0; i < n; i++) {
+    const slot = document.createElement('div');
+    slot.className = 'prog-slot';
+    slot.dataset.index = i;
+    slot.dataset.n = n;
+    slot.innerHTML = checkSVG();
+    row.appendChild(slot);
+  }
+}
+
+// ── Smile / Reset ──────────────────────────────────────────────
+
+function smile(rowId) {
+  const row   = document.getElementById(rowId);
+  const slots = row.querySelectorAll('.prog-slot');
+  const n     = slots.length;
+
+  slots.forEach((slot, i) => {
+    const offset = arcOffset(i, n);
+    const delay  = staggerDelay(i, n);
+    slot.style.transition =
+      `transform 0.60s cubic-bezier(0.34, 1.28, 0.64, 1) ${delay}ms`;
+    slot.style.transform = `translateY(${offset.toFixed(1)}px)`;
+  });
+
+  // Subtle green glow on the row while smiling
+  row.style.transition = 'filter 0.45s ease 0.1s';
+  row.style.filter = 'drop-shadow(0 0 8px rgba(100,230,120,0.32))';
+}
+
+function reset(rowId) {
+  const row   = document.getElementById(rowId);
+  const slots = row.querySelectorAll('.prog-slot');
+
+  slots.forEach(slot => {
+    slot.style.transition = 'transform 0.9s cubic-bezier(0.25,0.46,0.45,0.94)';
+    slot.style.transform  = 'translateY(0px)';
+  });
+
+  row.style.transition = 'filter 0.5s ease';
+  row.style.filter = '';
+}
+
+function triggerAll() {
+  ['row5','row4','row3'].forEach((id, k) => {
+    setTimeout(() => smile(id), k * 120);
+  });
+}
+
+// ── Init ───────────────────────────────────────────────────────
+
+buildRow('row5', 5);
+buildRow('row4', 4);
+buildRow('row3', 3);
+
+// Auto-demo on load
+setTimeout(triggerAll, 700);
+</script>
+</body>
+</html>

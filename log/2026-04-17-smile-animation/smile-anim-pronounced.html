@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Smile Animation — Pronounced (18px arc + scale)</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #1a1612;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    min-height: 100vh;
+    font-family: 'Inter', sans-serif;
+    color: #e8d5b0;
+  }
+  h2 { font-size: 14px; letter-spacing: 0.1em; text-transform: uppercase;
+       opacity: 0.5; margin-bottom: 32px; }
+
+  #progress-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    min-height: 80px;
+    position: relative;
+  }
+
+  .prog-slot {
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.7s cubic-bezier(0.34, 1.4, 0.64, 1);
+  }
+
+  /* Pronounced — 18px arc, slight scale-up on outer circles to sell the lift.
+     Offsets (negative = up):
+       i=0: -18px, scale 1.08
+       i=1:  -8px, scale 1.03
+       i=2:  +3px  (center sags just a touch)
+       i=3:  -8px, scale 1.03
+       i=4: -18px, scale 1.08
+     Stagger: outer circles animate slightly after center so the wave
+     ripples outward from the middle.
+  */
+  #progress-row.smiling .prog-slot:nth-child(3) {
+    transform: translateY(3px);
+    transition-delay: 0s;
+  }
+  #progress-row.smiling .prog-slot:nth-child(2),
+  #progress-row.smiling .prog-slot:nth-child(4) {
+    transform: translateY(-8px) scale(1.03);
+    transition-delay: 0.06s;
+  }
+  #progress-row.smiling .prog-slot:nth-child(1),
+  #progress-row.smiling .prog-slot:nth-child(5) {
+    transform: translateY(-18px) scale(1.08);
+    transition-delay: 0.12s;
+  }
+
+  /* Green shimmer ripple across the row */
+  #progress-row.smiling {
+    filter: drop-shadow(0 0 12px rgba(100, 230, 120, 0.5));
+    transition: filter 0.4s ease 0.2s;
+  }
+
+  /* Outer circle glow brightens as it rises */
+  #progress-row.smiling .prog-slot:nth-child(1) svg,
+  #progress-row.smiling .prog-slot:nth-child(5) svg {
+    filter: brightness(1.25);
+    transition: filter 0.5s ease 0.15s;
+  }
+
+  .prog-check { animation: popIn 0.22s cubic-bezier(0.34,1.56,0.64,1); }
+  @keyframes popIn {
+    from { transform: scale(0); opacity: 0; }
+    to   { transform: scale(1); opacity: 1; }
+  }
+
+  /* Bounce-back: after smiling, gently return (set via JS timeout) */
+  .prog-slot.returning {
+    transition: transform 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  .controls { margin-top: 56px; display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+  button {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.18);
+    color: #e8d5b0;
+    font-size: 13px; letter-spacing: 0.06em;
+    padding: 8px 20px; border-radius: 999px;
+    cursor: pointer;
+  }
+  button:hover { background: rgba(255,255,255,0.14); }
+
+  .label { font-size: 12px; opacity: 0.4; margin-top: 20px; letter-spacing: 0.05em; }
+  .note  { font-size: 11px; opacity: 0.3; margin-top: 8px; letter-spacing: 0.04em; }
+</style>
+</head>
+<body>
+
+<h2>Pronounced — 18 px arc + scale + stagger</h2>
+
+<div id="progress-row">
+  <div class="prog-slot">
+    <svg class="prog-check" width="28" height="28" viewBox="0 0 28 28" fill="none">
+      <circle cx="14" cy="14" r="12" fill="rgba(60,200,80,0.25)" stroke="rgba(80,220,100,0.70)" stroke-width="1.5"/>
+      <path d="M8 14 L12 18 L20 10" stroke="#6fe882" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+  <div class="prog-slot">
+    <svg class="prog-check" width="28" height="28" viewBox="0 0 28 28" fill="none">
+      <circle cx="14" cy="14" r="12" fill="rgba(60,200,80,0.25)" stroke="rgba(80,220,100,0.70)" stroke-width="1.5"/>
+      <path d="M8 14 L12 18 L20 10" stroke="#6fe882" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+  <div class="prog-slot">
+    <svg class="prog-check" width="28" height="28" viewBox="0 0 28 28" fill="none">
+      <circle cx="14" cy="14" r="12" fill="rgba(60,200,80,0.25)" stroke="rgba(80,220,100,0.70)" stroke-width="1.5"/>
+      <path d="M8 14 L12 18 L20 10" stroke="#6fe882" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+  <div class="prog-slot">
+    <svg class="prog-check" width="28" height="28" viewBox="0 0 28 28" fill="none">
+      <circle cx="14" cy="14" r="12" fill="rgba(60,200,80,0.25)" stroke="rgba(80,220,100,0.70)" stroke-width="1.5"/>
+      <path d="M8 14 L12 18 L20 10" stroke="#6fe882" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+  <div class="prog-slot">
+    <svg class="prog-check" width="28" height="28" viewBox="0 0 28 28" fill="none">
+      <circle cx="14" cy="14" r="12" fill="rgba(60,200,80,0.25)" stroke="rgba(80,220,100,0.70)" stroke-width="1.5"/>
+      <path d="M8 14 L12 18 L20 10" stroke="#6fe882" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+</div>
+
+<p class="label">← corners lift 18 px + scale, ripple outward from center →</p>
+<p class="note">Auto-returns to flat after 2 s</p>
+
+<div class="controls">
+  <button onclick="triggerSmile()">Trigger Smile</button>
+  <button onclick="resetSmile()">Reset Flat</button>
+  <button onclick="loopDemo()">Loop Demo</button>
+</div>
+
+<script>
+let loopTimer = null;
+
+function triggerSmile() {
+  const row = document.getElementById('progress-row');
+  row.classList.add('smiling');
+  // Auto-return to flat after 2s
+  setTimeout(() => resetSmile(), 2000);
+}
+
+function resetSmile() {
+  const row = document.getElementById('progress-row');
+  row.classList.remove('smiling');
+}
+
+function loopDemo() {
+  if (loopTimer) {
+    clearInterval(loopTimer);
+    loopTimer = null;
+    resetSmile();
+    return;
+  }
+  triggerSmile();
+  loopTimer = setInterval(() => triggerSmile(), 3200);
+}
+
+setTimeout(triggerSmile, 800);
+</script>
+</body>
+</html>
