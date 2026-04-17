@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p \"C:/Users/CaseyM/OneDrive/.claude/skills/audit\")",
+      "Bash(mv \"C:/Users/CaseyM/OneDrive/.claude/skills/audit-SKILL.md\" \"C:/Users/CaseyM/OneDrive/.claude/skills/audit/SKILL.md\")"
+    ]
+  }
+}
