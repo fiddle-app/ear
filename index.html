@@ -702,6 +702,11 @@ background: rgba(0,0,0,0.72); align-items: center; justify-content: center;
         </div>
       </div>
 
+      <div class="s-row">
+        <div><div class="s-label">App Version</div><div class="s-sub">Force reload from server</div></div>
+        <button class="log-action-btn" onclick="reloadFromServer()">Reload</button>
+      </div>
+
       <button id="s-reset-btn" onclick="openResetDefaults()">Reset to defaults…</button>
       <div style="height:28px"></div>
     </div>
@@ -955,6 +960,9 @@ function clearLog() {
 try { localStorage.removeItem(LOG_KEY); } catch(e){}
 updateLogUI();
 logEvent('Log cleared');
+}
+function reloadFromServer() {
+window.location.replace(window.location.pathname + '?nocache=' + Date.now());
 }
 function updateLogUI() {
 const chk = $('s-logging-chk');
