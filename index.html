@@ -737,7 +737,6 @@ background: rgba(0,0,0,0.72); align-items: center; justify-content: center;
       <div>
         <div style="font-size:clamp(20px,6vw,26px);font-weight:600;letter-spacing:0.04em;color:#1a1008;">Ear Tuner</div>
         <div style="font-size:clamp(11px,3vw,13px);color:rgba(0,0,0,0.40);letter-spacing:0.06em;margin-top:2px;">ear training for musicians</div>
-        <div id="build-date-display" style="font-size:clamp(10px,2.5vw,12px);color:rgba(0,0,0,0.30);letter-spacing:0.04em;margin-top:3px;font-family:monospace;"></div>
       </div>
     </div>
     <p id="info-inspiration" class="info-p">
@@ -796,6 +795,7 @@ background: rgba(0,0,0,0.72); align-items: center; justify-content: center;
         <path d="M11 11 L23 23M23 11 L11 23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
       </svg>
     </button>
+    <div id="build-date-display" style="font-size:11px;color:rgba(0,0,0,0.25);letter-spacing:0.04em;text-align:center;margin-top:8px;font-family:monospace;"></div>
   </div>
 </div>
 
@@ -832,7 +832,7 @@ const SOUNDS = [
 // ══════════════════════════════════════════════════════
 // CONSTANTS
 // ══════════════════════════════════════════════════════
-const BUILD_DATE  = '2026-04-18';   // ← update on every commit
+const BUILD_DATE  = '2026-04-17 23:37';   // ← update on every commit (YYYY-MM-DD HH:mm)
 const CENTS_SEQ   = [100, 50, 25, 20, 15, 10, 7, 6, 5, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, 1.5, 1.0, 0.5];
 const MAX_CENTS   = CENTS_SEQ[0]; // 100 — largest/easiest difference
 const fmtC        = c => Number.isInteger(c) ? c+'¢' : c.toFixed(1)+'¢'; // format cents value
