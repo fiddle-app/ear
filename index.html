@@ -737,6 +737,7 @@ background: rgba(0,0,0,0.72); align-items: center; justify-content: center;
       <div>
         <div style="font-size:clamp(20px,6vw,26px);font-weight:600;letter-spacing:0.04em;color:#1a1008;">Ear Tuner</div>
         <div style="font-size:clamp(11px,3vw,13px);color:rgba(0,0,0,0.40);letter-spacing:0.06em;margin-top:2px;">ear training for musicians</div>
+        <div id="build-date-display" style="font-size:clamp(10px,2.5vw,12px);color:rgba(0,0,0,0.30);letter-spacing:0.04em;margin-top:3px;font-family:monospace;"></div>
       </div>
     </div>
     <p id="info-inspiration" class="info-p">
@@ -831,6 +832,7 @@ const SOUNDS = [
 // ══════════════════════════════════════════════════════
 // CONSTANTS
 // ══════════════════════════════════════════════════════
+const BUILD_DATE  = '2026-04-18';   // ← update on every commit
 const CENTS_SEQ   = [100, 50, 25, 20, 15, 10, 7, 6, 5, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, 1.5, 1.0, 0.5];
 const MAX_CENTS   = CENTS_SEQ[0]; // 100 — largest/easiest difference
 const fmtC        = c => Number.isInteger(c) ? c+'¢' : c.toFixed(1)+'¢'; // format cents value
@@ -877,7 +879,7 @@ let awaiting                 = false;
 let roundFailed              = false;
 let currentRound             = {};
 let audioCtx                 = null;
-let contextNeedsReset        = false;   // iOS zombie-context flag
+let audioCtxGeneration       = 0;       // bumped on every recreate — stale refs can detect zombie
 
 // Per-note playing handles for review mode single-note replay
 let playingNode1   = null;
@@ -979,19 +981,26 @@ const mt = document.getElementById('meta-theme');
 if (mt) mt.setAttribute('content', color);
 }
 
-async function ensureAudio() {
-// iOS zombie-context: state stays 'running' but hardware is silenced.
-// Close the old context and recreate on the next user gesture.
-if (contextNeedsReset && audioCtx) {
-  logEvent(`ensureAudio | closing zombie context | prev.state=${audioCtx.state}`);
-  try { await audioCtx.close(); } catch(e){}
-  audioCtx = null;
-  // Soundfont instruments are bound to the old context — clear so they reload
-  Object.keys(sfInstruments).forEach(k => delete sfInstruments[k]);
-  Object.keys(sfLoadingP).forEach(k => delete sfLoadingP[k]);
-  contextNeedsReset = false;
+function nukeAudioCtx(reason) {
+// Abandon the old context — don't await close(), just orphan it.
+// Avoids async gaps that lose the user-gesture context on iOS.
+if (!audioCtx) return;
+const old = audioCtx;
+audioCtx = null;
+audioCtxGeneration++;
+// Soundfont instruments are bound to the old context — must reload
+Object.keys(sfInstruments).forEach(k => delete sfInstruments[k]);
+Object.keys(sfLoadingP).forEach(k => delete sfLoadingP[k]);
+logEvent(`nukeAudioCtx | reason=${reason} | gen=${audioCtxGeneration} | old.state=${old.state}`);
+// Fire-and-forget close so the OS reclaims hardware eventually
+try { old.close(); } catch(e){}
 }
-if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+async function ensureAudio() {
+if (!audioCtx) {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  logEvent(`ensureAudio | new ctx created | gen=${audioCtxGeneration} | state=${audioCtx.state}`);
+}
 if (audioCtx.state === 'suspended') {
   try { await audioCtx.resume(); } catch(e){}
 }
@@ -1010,22 +1019,19 @@ setTimeout(() => {
 }, 100);
 });
 document.addEventListener('visibilitychange', () => {
-if (document.visibilityState === 'visible' && audioCtx) {
-  logEvent(`visibilitychange → visible | audioCtx.state=${audioCtx.state}`);
-  if (audioCtx.state === 'suspended') {
-    audioCtx.resume().catch(()=>{});
-  } else {
-    // state='running' but iOS may have silenced the hardware (zombie context).
-    // Schedule a full close+recreate on the next user-gesture play action.
-    contextNeedsReset = true;
-  }
+if (document.visibilityState === 'visible') {
+  logEvent(`visibilitychange → visible | audioCtx.state=${audioCtx ? audioCtx.state : 'null'}`);
+  // iOS zombie-context: state stays 'running' but hardware output is disconnected.
+  // Nuke unconditionally — ensureAudio() will recreate on next user gesture.
+  if (audioCtx) nukeAudioCtx('visibility-restore');
 } else if (document.visibilityState === 'hidden') {
   logEvent(`visibilitychange → hidden | audioCtx.state=${audioCtx ? audioCtx.state : 'null'}`);
 }
 });
 window.addEventListener('pageshow', (e) => {
 logEvent(`pageshow | persisted=${e.persisted} | audioCtx.state=${audioCtx ? audioCtx.state : 'null'}`);
-if (audioCtx) audioCtx.resume().catch(()=>{});
+// Nuke here too — pageshow may fire without visibilitychange (BFCache)
+if (audioCtx) nukeAudioCtx('pageshow');
 // iOS BFCache restores DOM inline styles including visibility:hidden set by openInfo
 // Always reset to ensure app is visible on restore
 if ($('app')) {
@@ -1034,9 +1040,8 @@ if ($('app')) {
   $('info-overlay').classList.remove('open');
 }
 });
-window.addEventListener('focus', () => {
-if (audioCtx) audioCtx.resume().catch(()=>{});
-});
+// No focus handler for audioCtx — visibilitychange and pageshow cover all cases.
+// Calling resume() on a zombie context here was counterproductive.
 
 // ══════════════════════════════════════════════════════
 // SOUNDFONT LOADING via soundfont-player
@@ -1322,8 +1327,9 @@ playNote(currentRound.note2Midi, t2, dur).then(h=>{ playingNode2=h; });
 }
 
 function stopAllSounds() {
-if (playingNode1) { try{ playingNode1.stopAt(audioCtx.currentTime); }catch(e){} playingNode1=null; }
-if (playingNode2) { try{ playingNode2.stopAt(audioCtx.currentTime); }catch(e){} playingNode2=null; }
+const t = audioCtx ? audioCtx.currentTime : 0;
+if (playingNode1) { try{ playingNode1.stopAt(t); }catch(e){} playingNode1=null; }
+if (playingNode2) { try{ playingNode2.stopAt(t); }catch(e){} playingNode2=null; }
 clearPlayTimers();
 $('note-left').classList.remove('playing');
 $('note-right').classList.remove('playing');
@@ -1335,8 +1341,8 @@ stopAllSounds();
 playBothNotes();
 }
 
-function playOneNote(side) {
-ensureAudio();
+async function playOneNote(side) {
+await ensureAudio();
 stopAllSounds();
 const dur = noteDur();
 const now = audioCtx.currentTime + 0.02;
@@ -1728,7 +1734,7 @@ saveSettings(); renderSettings();
 
 function schedulePreview() {
 if (previewTimer) clearTimeout(previewTimer);
-previewTimer=setTimeout(()=>{ ensureAudio(); const dur=noteDur(); playNote(69, audioCtx.currentTime+0.04, dur); }, 150);
+previewTimer=setTimeout(async ()=>{ await ensureAudio(); const dur=noteDur(); playNote(69, audioCtx.currentTime+0.04, dur); }, 150);
 }
 
 function renderSettings() {
@@ -1758,7 +1764,7 @@ SOUNDS.forEach((s,idx)=>{
 
 async function selectSound(idx) {
 settings.soundIdx=idx; saveSettings(); renderSoundGrid();
-ensureAudio();
+await ensureAudio();
 const sound=SOUNDS[idx];
 if (sound.type==='sf'&&!sfInstruments[sound.sfName]) {
   try { await loadSfInstrument(sound.sfName); } catch(e){ console.warn('SF load failed:',e); }
@@ -1770,8 +1776,8 @@ playNote(69, audioCtx.currentTime+0.06, dur);
 
 let settingsOpenTestsPerRound = 3;
 
-function openSettings() {
-ensureAudio();
+async function openSettings() {
+await ensureAudio();
 settingsOpenTestsPerRound = settings.testsPerRound;
 const s=SOUNDS[settings.soundIdx];
 if (s.type==='sf'&&!sfInstruments[s.sfName]) loadSfInstrument(s.sfName).then(()=>renderSoundGrid()).catch(()=>{});
@@ -1806,6 +1812,8 @@ btn.innerHTML = isOpen ? '▲ <span>Show less</span>' : '… more';
 
 function openInfo() {
 setBg('#f5efe6');
+const bd = $('build-date-display');
+if (bd) bd.textContent = 'build ' + BUILD_DATE;
 $('info-overlay').classList.add('open');
 $('app').style.visibility = 'hidden';
 $('swipe-hint').style.visibility = 'hidden';
@@ -1976,9 +1984,9 @@ pn.forEach((note, i) => {
 });
 }
 
-function startRetest(n) {
+async function startRetest(n) {
 if ($('start-btn').style.display === 'block') {
-  ensureAudio();
+  await ensureAudio();
   hideStartScreen();
   const s = SOUNDS[settings.soundIdx];
   if (s.type === 'sf') {
@@ -2143,8 +2151,8 @@ $('lower-half').style.visibility   = 'visible';
 $('diff-value').textContent = fmtC(CENTS_SEQ[centsIdx]);
 }
 
-function handleStart() {
-ensureAudio();
+async function handleStart() {
+await ensureAudio();
 hideStartScreen();
 const s = SOUNDS[settings.soundIdx];
 if (s.type === 'sf') {
