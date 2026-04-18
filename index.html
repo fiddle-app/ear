@@ -834,10 +834,23 @@ const SOUNDS = [
 { id:'elec-bass',     label:'Electric Bass',      type:'sf', sfName:'electric_bass_finger'  },
 ];
 
+// Per-voice SF gain — calibrated by calibrate.js (target: violin × 1.5 current loudness, -22 dBFS).
+// Raw sample levels vary widely across instruments; these normalize them to equal loudness.
+const VOICE_GAIN = {
+  'violin':      8.22,
+  'viola':       6.03,
+  'cello':       3.39,
+  'contrabass':  2.40,
+  'gtr-nylon':   9.33,
+  'gtr-steel':  10.72,
+  'piano':      12.88,
+  'elec-bass':   9.66,
+};
+
 // ══════════════════════════════════════════════════════
 // CONSTANTS
 // ══════════════════════════════════════════════════════
-const BUILD_DATE  = '2026-04-18 09:45';   // stamped automatically by deploy.sh — do not edit manually
+const BUILD_DATE  = '2026-04-18 18:05';   // stamped automatically by deploy.sh — do not edit manually
 const CENTS_SEQ   = [100, 50, 25, 20, 15, 10, 7, 6, 5, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, 1.5, 1.0, 0.5];
 const MAX_CENTS   = CENTS_SEQ[0]; // 100 — largest/easiest difference
 const fmtC        = c => Number.isInteger(c) ? c+'¢' : c.toFixed(1)+'¢'; // format cents value
@@ -1074,10 +1087,10 @@ return sfLoadingP[sfName];
 // ══════════════════════════════════════════════════════
 // PLAY FUNCTIONS — all return a handle with stopAt()
 // ══════════════════════════════════════════════════════
-function playSfNote(inst, midiF, startTime, duration) {
+function playSfNote(inst, midiF, startTime, duration, gain) {
 // soundfont-player: inst.play(note, time, options) — accepts fractional midi for detuning
 // Returns an AudioNode with .stop(when)
-const node = inst.play(midiF, startTime, { duration: duration, gain: 5.5 });
+const node = inst.play(midiF, startTime, { duration: duration, gain: gain });
 return {
   stopAt(t) { try { node.stop(t); } catch(e){} }
 };
@@ -1087,7 +1100,7 @@ function playSynthViolin(freqHz, startTime, duration) {
 const ctx    = audioCtx;
 const atk    = ATK_PRESETS[settings.attack][1];
 const rel    = DEC_PRESETS[settings.decay][1];
-const peak   = 0.35, sus=0.65, dec=0.10;
+const peak   = 0.137, sus=0.65, dec=0.10;
 
 const mg = ctx.createGain(); mg.connect(ctx.destination);
 mg.gain.setValueAtTime(0,startTime);
@@ -1131,8 +1144,8 @@ const atk = ATK_PRESETS[settings.attack][1];
 const rel = DEC_PRESETS[settings.decay][1];
 const osc=ctx.createOscillator(), g=ctx.createGain();
 osc.type='sine'; osc.frequency.setValueAtTime(freqHz,startTime);
-g.gain.setValueAtTime(0,startTime); g.gain.linearRampToValueAtTime(0.40,startTime+atk);
-g.gain.setValueAtTime(0.40,startTime+duration-rel); g.gain.linearRampToValueAtTime(0,startTime+duration);
+g.gain.setValueAtTime(0,startTime); g.gain.linearRampToValueAtTime(0.112,startTime+atk);
+g.gain.setValueAtTime(0.112,startTime+duration-rel); g.gain.linearRampToValueAtTime(0,startTime+duration);
 osc.connect(g); g.connect(ctx.destination);
 osc.start(startTime); osc.stop(startTime+duration+0.1);
 return { gain:g, stopAt(t){ g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(g.gain.value,t); g.gain.linearRampToValueAtTime(0,t+0.04); try{osc.stop(t+0.05);}catch(e){} } };
@@ -1146,7 +1159,7 @@ if (sound.type==='synth') return playSynthViolin(hz, startTime, duration);
 if (sound.type==='sine')  return playSineTone(hz, startTime, duration);
 // SF via soundfont-player
 const inst = sfInstruments[sound.sfName];
-if (inst) return playSfNote(inst, midiF, startTime, duration);
+if (inst) return playSfNote(inst, midiF, startTime, duration, VOICE_GAIN[sound.id] ?? 8.0);
 return playSynthViolin(hz, startTime, duration); // fallback while loading
 }
 
