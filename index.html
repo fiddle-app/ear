@@ -877,6 +877,7 @@ let awaiting                 = false;
 let roundFailed              = false;
 let currentRound             = {};
 let audioCtx                 = null;
+let contextNeedsReset        = false;   // iOS zombie-context flag
 
 // Per-note playing handles for review mode single-note replay
 let playingNode1   = null;
@@ -979,6 +980,17 @@ if (mt) mt.setAttribute('content', color);
 }
 
 async function ensureAudio() {
+// iOS zombie-context: state stays 'running' but hardware is silenced.
+// Close the old context and recreate on the next user gesture.
+if (contextNeedsReset && audioCtx) {
+  logEvent(`ensureAudio | closing zombie context | prev.state=${audioCtx.state}`);
+  try { await audioCtx.close(); } catch(e){}
+  audioCtx = null;
+  // Soundfont instruments are bound to the old context — clear so they reload
+  Object.keys(sfInstruments).forEach(k => delete sfInstruments[k]);
+  Object.keys(sfLoadingP).forEach(k => delete sfLoadingP[k]);
+  contextNeedsReset = false;
+}
 if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 if (audioCtx.state === 'suspended') {
   try { await audioCtx.resume(); } catch(e){}
@@ -1000,7 +1012,13 @@ setTimeout(() => {
 document.addEventListener('visibilitychange', () => {
 if (document.visibilityState === 'visible' && audioCtx) {
   logEvent(`visibilitychange → visible | audioCtx.state=${audioCtx.state}`);
-  audioCtx.resume().catch(()=>{});
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume().catch(()=>{});
+  } else {
+    // state='running' but iOS may have silenced the hardware (zombie context).
+    // Schedule a full close+recreate on the next user-gesture play action.
+    contextNeedsReset = true;
+  }
 } else if (document.visibilityState === 'hidden') {
   logEvent(`visibilitychange → hidden | audioCtx.state=${audioCtx ? audioCtx.state : 'null'}`);
 }
