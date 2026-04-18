@@ -703,7 +703,7 @@ background: rgba(0,0,0,0.72); align-items: center; justify-content: center;
       </div>
 
       <div class="s-row">
-        <div><div class="s-label">App Version</div><div class="s-sub">Force reload from server</div></div>
+        <div><div class="s-label">App Version</div><div class="s-sub" id="s-build-date"></div></div>
         <button class="log-action-btn" onclick="reloadFromServer()">Reload</button>
       </div>
 
@@ -1753,6 +1753,7 @@ $('s-tests-per-round').textContent = settings.testsPerRound;
 $('s-note-dur').textContent    = DUR_STEPS[settings.noteDurIdx].toFixed(1)+'s';
 $('s-attack').textContent      = ATK_PRESETS[settings.attack][0];
 $('s-decay').textContent       = DEC_PRESETS[settings.decay][0];
+$('s-build-date').textContent  = 'build ' + BUILD_DATE;
 renderSoundGrid();
 renderShakeBtn();
 updateLogUI();
