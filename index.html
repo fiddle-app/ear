@@ -1077,7 +1077,7 @@ return sfLoadingP[sfName];
 function playSfNote(inst, midiF, startTime, duration) {
 // soundfont-player: inst.play(note, time, options) — accepts fractional midi for detuning
 // Returns an AudioNode with .stop(when)
-const node = inst.play(midiF, startTime, { duration: duration, gain: 4.5 });
+const node = inst.play(midiF, startTime, { duration: duration, gain: 5.5 });
 return {
   stopAt(t) { try { node.stop(t); } catch(e){} }
 };
@@ -1307,6 +1307,12 @@ function clearPlayTimers() { playTimers.forEach(clearTimeout); playTimers=[]; }
 async function playBothNotes() {
 stopAllSounds();
 await ensureAudio();
+// If SF instrument was cleared by context nuke, reload before scheduling so
+// we don't fall back to synth violin (which is much louder than the samples).
+const _snd = SOUNDS[settings.soundIdx];
+if (_snd.type === 'sf' && !sfInstruments[_snd.sfName]) {
+  try { await loadSfInstrument(_snd.sfName); } catch(e){}
+}
 logEvent(`playBothNotes | audioCtx.state=${audioCtx.state} | note=${currentNote?.name} | cents=${fmtC(CENTS_SEQ[centsIdx])}`);
 const dur = noteDur();
 const now = audioCtx.currentTime + 0.06;
@@ -1351,6 +1357,10 @@ playBothNotes();
 
 async function playOneNote(side) {
 await ensureAudio();
+const _snd2 = SOUNDS[settings.soundIdx];
+if (_snd2.type === 'sf' && !sfInstruments[_snd2.sfName]) {
+  try { await loadSfInstrument(_snd2.sfName); } catch(e){}
+}
 stopAllSounds();
 const dur = noteDur();
 const now = audioCtx.currentTime + 0.02;
