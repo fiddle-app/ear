@@ -473,13 +473,39 @@ min-height: 60px;
 position: relative;
 }
 #stats-chart { width: 100%; height: 100%; }
+#info-copy-row {
+display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+#info-copy-scores-btn {
+-webkit-appearance: none; font-family: var(--font); font-size: clamp(13px, 3.5vw, 15px);
+padding: 10px 22px; border-radius: 999px; cursor: pointer;
+border: none; background: #7a2900; color: #fff;
+flex-shrink: 0; transition: background 0.15s, opacity 0.15s;
+}
+#info-copy-scores-btn:active { background: #5a1e00; }
+#info-copy-label {
+font-size: clamp(12px, 3vw, 13px); color: rgba(0,0,0,0.45); line-height: 1.4;
+}
+hr.info-divider {
+border: none; border-top: 1px solid rgba(0,0,0,0.12); margin: 0;
+}
+#info-destructive-row {
+display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+}
 #info-global-reset {
 -webkit-appearance: none; font-family: var(--font); font-size: clamp(13px, 3.5vw, 15px);
 padding: 10px 22px; border-radius: 999px; cursor: pointer;
 border: 1.5px solid rgba(0,0,0,0.15); background: rgba(0,0,0,0.06); color: rgba(0,0,0,0.45);
-align-self: flex-start; margin-top: 4px; transition: background 0.15s;
+transition: background 0.15s;
 }
 #info-global-reset:active { background: rgba(0,0,0,0.12); }
+#info-fake-history {
+-webkit-appearance: none; font-family: var(--font); font-size: clamp(13px, 3.5vw, 15px);
+padding: 10px 22px; border-radius: 999px; cursor: pointer;
+border: 1.5px solid rgba(60,100,180,0.40); background: rgba(60,100,180,0.10); color: #1a3a7a;
+transition: background 0.15s;
+}
+#info-fake-history:active { background: rgba(60,100,180,0.20); }
 
 /* Confirm */
 #confirm-overlay {
@@ -782,14 +808,17 @@ background: rgba(0,0,0,0.72); align-items: center; justify-content: center;
       <thead><tr><th>Note</th><th>Best</th><th>Failed</th><th></th></tr></thead>
       <tbody id="stats-tbody"></tbody>
     </table>
-    <button id="info-global-reset" onclick="confirmResetAll()">Reset All Scores</button>
-    <button id="info-fake-history" onclick="fakeHistory()"
-      style="-webkit-appearance:none;font-family:var(--font);font-size:clamp(13px,3.5vw,15px);
-      padding:10px 22px;border-radius:999px;cursor:pointer;
-      border:1.5px solid rgba(60,100,180,0.40);background:rgba(60,100,180,0.10);color:#1a3a7a;
-      align-self:flex-start;margin-top:0;transition:background 0.15s;">
-      Fake Scores
-    </button>
+    <div id="info-copy-row">
+      <button id="info-copy-scores-btn" onclick="copyScores()">Copy Scores</button>
+      <span id="info-copy-label">Paste into an email to share with a friend.</span>
+    </div>
+
+    <hr class="info-divider">
+
+    <div id="info-destructive-row">
+      <button id="info-global-reset" onclick="confirmResetAll()">Reset All Scores</button>
+      <button id="info-fake-history" onclick="confirmRandomizeScores()">Randomize Scores</button>
+    </div>
 
     <p style="font-size:clamp(11px,3vw,13px);color:rgba(0,0,0,0.40);line-height:1.6;margin-top:4px;">
       Instrument samples from the <a href="https://github.com/gleitz/midi-js-soundfonts" target="_blank" style="color:rgba(0,0,0,0.50);">MusyngKite soundfont</a>, used under <a href="https://creativecommons.org/licenses/by-sa/3.0/" target="_blank" style="color:rgba(0,0,0,0.50);">CC BY-SA 3.0</a>.
@@ -850,7 +879,7 @@ const VOICE_GAIN = {
 // ══════════════════════════════════════════════════════
 // CONSTANTS
 // ══════════════════════════════════════════════════════
-const BUILD_DATE  = '2026-04-18 18:09';   // stamped automatically by deploy.sh — do not edit manually
+const BUILD_DATE  = '2026-04-19 13:00';   // stamped automatically by deploy.sh — do not edit manually
 const CENTS_SEQ   = [100, 50, 25, 20, 15, 10, 7, 6, 5, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, 1.5, 1.0, 0.5];
 const MAX_CENTS   = CENTS_SEQ[0]; // 100 — largest/easiest difference
 const fmtC        = c => Number.isInteger(c) ? c+'¢' : c.toFixed(1)+'¢'; // format cents value
@@ -2114,6 +2143,87 @@ ALL_NOTES.forEach(note => {
 });
 saveStats();
 renderStats();
+}
+
+function confirmRandomizeScores() {
+showConfirm('Randomize Scores', 'This will erase all existing scores and replace them with random data.', fakeHistory);
+}
+
+function copyScores() {
+const lowestHz  = midiToHz(ALL_NOTES[settings.lowestNote].midi);
+const highestHz = midiToHz(ALL_NOTES[settings.highestNote].midi);
+const scored = ALL_NOTES
+  .filter(n => {
+    const hz = midiToHz(n.midi);
+    return hz >= lowestHz - 0.01 && hz <= highestHz + 0.01 && stats[n.name]?.bestCents != null;
+  })
+  .sort((a, b) => midiToHz(a.midi) - midiToHz(b.midi));
+
+const btn = $('info-copy-scores-btn');
+if (!scored.length) {
+  btn.textContent = 'No scores yet';
+  setTimeout(() => { btn.textContent = 'Copy Scores'; }, 2000);
+  return;
+}
+
+const avg   = scored.reduce((s, n) => s + stats[n.name].bestCents, 0) / scored.length;
+const worst = Math.max(...scored.map(n => stats[n.name].bestCents));
+
+const introText = 'These are my Ear Tuner scores. Each score is the smallest pitch gap I can reliably hear at that note\u2019s frequency, measured in cents (hundredths of a semitone). Lower is better. Check out https://fiddle-app.github.io/ear to test your own aural acuity.';
+const introHtml = introText.replace('https://fiddle-app.github.io/ear', '<a href="https://fiddle-app.github.io/ear" style="color:#7a2900;">https://fiddle-app.github.io/ear</a>');
+
+const rows = scored.map(n => {
+  const c   = stats[n.name].bestCents;
+  const pct = Math.round((c / worst) * 100);
+  return `<tr>
+    <td style="font-weight:600;padding:4px 12px 4px 0;border-bottom:1px solid rgba(0,0,0,0.07);width:52px;">${dn(n.name)}</td>
+    <td style="font-weight:600;color:#7a2900;padding:4px 12px 4px 0;border-bottom:1px solid rgba(0,0,0,0.07);width:48px;">${fmtC(c)}</td>
+    <td style="width:100%;padding:4px 0 4px 4px;border-bottom:1px solid rgba(0,0,0,0.07);vertical-align:middle;">
+      <div style="background:rgba(0,0,0,0.07);border-radius:3px;height:8px;width:100%;">
+        <div style="background:#b83c08;border-radius:3px;height:8px;width:${pct}%;"></div>
+      </div>
+    </td>
+  </tr>`;
+}).join('');
+
+const html = `<div style="font-family:'Inconsolata',monospace,sans-serif;color:#2a2018;font-size:14px;">
+  <p style="color:#444;font-size:13px;line-height:1.65;margin:0 0 16px;">${introHtml}</p>
+  <div style="background:rgba(180,60,20,0.10);border-left:3px solid #b83c08;padding:8px 14px;border-radius:0 6px 6px 0;margin-bottom:18px;font-size:13px;color:#7a2900;font-weight:600;display:inline-block;">Average score: ${avg.toFixed(1)}\u00a2</div>
+  <table style="border-collapse:collapse;width:100%;max-width:440px;">
+    <thead><tr>
+      <th style="font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(0,0,0,0.38);text-align:left;padding:0 12px 6px 0;border-bottom:2px solid rgba(0,0,0,0.15);font-weight:600;">Note</th>
+      <th style="font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(0,0,0,0.38);text-align:left;padding:0 12px 6px 0;border-bottom:2px solid rgba(0,0,0,0.15);font-weight:600;">Score</th>
+      <th style="width:100%;border-bottom:2px solid rgba(0,0,0,0.15);padding-bottom:6px;"> </th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <p style="margin-top:14px;font-size:11px;color:rgba(0,0,0,0.35);">Ear Tuner \u00b7 fiddle-app.github.io/ear</p>
+</div>`;
+
+const noteColW = Math.max(...scored.map(n => dn(n.name).length));
+const plainRows = scored.map(n => dn(n.name).padEnd(noteColW + 2) + fmtC(stats[n.name].bestCents)).join('\n');
+const plain = `${introText}\n\nAverage: ${avg.toFixed(1)}\u00a2\n\nNote${''.padEnd(noteColW - 2)}  Score\n${'─'.repeat(noteColW + 8)}\n${plainRows}`;
+
+try {
+  const item = new ClipboardItem({
+    'text/html':  new Blob([html],  { type: 'text/html' }),
+    'text/plain': new Blob([plain], { type: 'text/plain' }),
+  });
+  navigator.clipboard.write([item]).then(() => {
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = 'Copy Scores'; }, 2000);
+  }).catch(() => {
+    navigator.clipboard.writeText(plain).then(() => {
+      btn.textContent = 'Copied (text)';
+      setTimeout(() => { btn.textContent = 'Copy Scores'; }, 2000);
+    });
+  });
+} catch(e) {
+  navigator.clipboard.writeText(plain).then(() => {
+    btn.textContent = 'Copied (text)';
+    setTimeout(() => { btn.textContent = 'Copy Scores'; }, 2000);
+  });
+}
 }
 
 (function() {
