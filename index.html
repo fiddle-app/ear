@@ -570,7 +570,7 @@ background: rgba(0,0,0,0.72); align-items: center; justify-content: center;
 #confirm-no  { background: rgba(255,255,255,0.14); color: #fff; }
 </style>
 
-<script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"></script>
+<script src="soundfont-player.min.js"></script>
 
 </head>
 <body>
@@ -944,7 +944,7 @@ const VOICE_GAIN = {
 // ══════════════════════════════════════════════════════
 // CONSTANTS
 // ══════════════════════════════════════════════════════
-const BUILD_DATE  = '2026-04-19 20:33';   // stamped automatically by deploy.sh — do not edit manually
+const BUILD_DATE  = '2026-04-19 20:42';   // stamped automatically by deploy.sh — do not edit manually
 const CENTS_SEQ   = [100, 50, 25, 20, 15, 10, 7, 6, 5, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, 1.5, 1.0, 0.5];
 const MAX_CENTS   = CENTS_SEQ[0]; // 100 — largest/easiest difference
 const fmtC        = c => Number.isInteger(c) ? c+'¢' : c.toFixed(1)+'¢'; // format cents value
@@ -2443,6 +2443,11 @@ if (s.type === 'sf') {
   const welcomeIcon = document.getElementById('welcome-app-icon');
   if (welcomeIcon) welcomeIcon.src = dataUrl;
 })();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/ear/sw.js');
+}
 </script>
 </body>
 </html>
