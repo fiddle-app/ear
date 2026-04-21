@@ -1,0 +1,19 @@
+/* Fiddle App Family — Shared Design Tokens
+   Canonical source: fiddle/_shared/design/design-tokens.css
+   DO NOT edit per-app copies directly — edit here, then run sync-tokens.sh. */
+
+:root {
+  /* Primary palette */
+  --color-orange:      #b83c08;   /* primary accent, CTA buttons, retest bar fill */
+  --color-orange-2:    #7a2900;   /* secondary button bg (Copy Scores, stat buttons) */
+  --color-orange-dark: #8f2d06;   /* active/pressed state for primary CTA */
+  --color-parchment:   #f5efe6;   /* info/welcome overlay background */
+  --color-green:       #235a39;   /* retest mode bg, toggle active, stat retest btn */
+
+  /* Text */
+  --color-text-dark:  #2a2018;    /* primary dark text on parchment */
+  --color-text-muted: rgba(0,0,0,0.45);
+
+  /* Fonts */
+  --font: 'Inconsolata', monospace;
+}
