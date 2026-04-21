@@ -1,7 +1,7 @@
 // Ear Tuner — Service Worker
-// Pre-caches the app shell; runtime-caches fonts and sound samples.
+// Pre-caches the app shell; runtime-caches sound samples.
 
-const CACHE_VER   = 'v1';
+const CACHE_VER    = '2026-04-21 02:15';  // stamped by deploy.sh — do not edit manually
 const STATIC_CACHE = `ear-tuner-static-${CACHE_VER}`;
 const FONT_CACHE   = 'ear-tuner-fonts';
 const SOUND_CACHE  = 'ear-tuner-sounds';
@@ -9,7 +9,20 @@ const SOUND_CACHE  = 'ear-tuner-sounds';
 const PRECACHE = [
   '/ear/',
   '/ear/index.html',
+  '/ear/style.css',
   '/ear/soundfont-player.min.js',
+  '/ear/fonts/fonts.css',
+  '/ear/fonts/inconsolata-latin.woff2',
+  '/ear/fonts/nunito-latin.woff2',
+  '/ear/js/constants.js',
+  '/ear/js/persistence.js',
+  '/ear/js/log.js',
+  '/ear/js/audio-ctx.js',
+  '/ear/js/audio.js',
+  '/ear/js/game.js',
+  '/ear/js/render.js',
+  '/ear/js/ui.js',
+  '/ear/js/boot.js',
 ];
 
 // ── Install: pre-cache app shell ──────────────────────────────────────────────
@@ -37,25 +50,14 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // Font files (versioned, immutable) — cache-first
-  if (url.hostname === 'fonts.gstatic.com') {
-    event.respondWith(cacheFirst(event.request, FONT_CACHE));
-    return;
-  }
-
-  // Font CSS from googleapis — stale-while-revalidate
-  if (url.hostname === 'fonts.googleapis.com') {
-    event.respondWith(staleWhileRevalidate(event.request, FONT_CACHE));
-    return;
-  }
-
   // Sound samples — cache-first after first load
+  // (not in PRECACHE — too large for first install; cached on demand)
   if (url.pathname.includes('/sounds/')) {
     event.respondWith(cacheFirst(event.request, SOUND_CACHE));
     return;
   }
 
-  // Everything else (app shell, soundfont-player.min.js) — cache-first
+  // Everything else (app shell, JS, fonts) — cache-first
   event.respondWith(cacheFirst(event.request, STATIC_CACHE));
 });
 
@@ -73,14 +75,4 @@ async function cacheFirst(request, cacheName) {
   } catch (err) {
     return new Response('Offline', { status: 503, statusText: 'Offline' });
   }
-}
-
-async function staleWhileRevalidate(request, cacheName) {
-  const cache  = await caches.open(cacheName);
-  const cached = await cache.match(request);
-  const fetchP = fetch(request).then(response => {
-    if (response.ok) cache.put(request, response.clone());
-    return response;
-  }).catch(() => cached);
-  return cached || fetchP;
 }
