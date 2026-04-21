@@ -502,18 +502,18 @@ const rows = scored.map(n => {
   </tr>`;
 }).join('');
 
-const html = `<div style="font-family:'Inconsolata',monospace,sans-serif;color:#2a2018;font-size:14px;">
-  <p style="color:#444;font-size:13px;line-height:1.65;margin:0 0 16px;">${introHtml}</p>
-  <div style="background:rgba(180,60,20,0.10);border-left:3px solid #b83c08;padding:8px 14px;border-radius:0 6px 6px 0;margin-bottom:18px;font-size:13px;color:#7a2900;font-weight:600;display:inline-block;">Average score: ${avg.toFixed(1)}\u00a2</div>
+const html = `<div style="font-family:'Inconsolata',monospace,sans-serif;color:#2a2018;font-size:15px;">
+  <p style="color:#444;font-size:14px;line-height:1.65;margin:0 0 16px;">${introHtml}</p>
+  <div style="background:rgba(180,60,20,0.10);border-left:3px solid #b83c08;padding:8px 14px;border-radius:0 6px 6px 0;margin-bottom:18px;font-size:14px;color:#7a2900;font-weight:600;display:inline-block;">Average score: ${avg.toFixed(1)}\u00a2</div>
   <table style="border-collapse:collapse;width:100%;max-width:440px;">
     <thead><tr>
-      <th style="font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(0,0,0,0.38);text-align:left;padding:0 12px 6px 0;border-bottom:2px solid rgba(0,0,0,0.15);font-weight:600;">Note</th>
-      <th style="font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(0,0,0,0.38);text-align:left;padding:0 12px 6px 0;border-bottom:2px solid rgba(0,0,0,0.15);font-weight:600;">Score</th>
+      <th style="font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(0,0,0,0.38);text-align:left;padding:0 12px 6px 0;border-bottom:2px solid rgba(0,0,0,0.15);font-weight:600;">Note</th>
+      <th style="font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(0,0,0,0.38);text-align:left;padding:0 12px 6px 0;border-bottom:2px solid rgba(0,0,0,0.15);font-weight:600;">Score</th>
       <th style="width:100%;border-bottom:2px solid rgba(0,0,0,0.15);padding-bottom:6px;"> </th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>
-  <p style="margin-top:14px;font-size:11px;color:rgba(0,0,0,0.35);">Ear Tuner \u00b7 fiddle-app.github.io/ear</p>
+  <p style="margin-top:14px;font-size:12px;color:rgba(0,0,0,0.35);">Ear Tuner \u00b7 fiddle-app.github.io/ear</p>
 </div>`;
 
 const noteColW = Math.max(...scored.map(n => dn(n.name).length));
