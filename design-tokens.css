@@ -5,15 +5,26 @@
 :root {
   /* Primary palette */
   --color-orange:      #b83c08;   /* primary accent, CTA buttons, retest bar fill */
-  --color-orange-2:    #7a2900;   /* secondary button bg (Copy Scores, stat buttons) */
+  --color-orange-2:    #7a2900;   /* secondary button bg; also used for links on parchment */
   --color-orange-dark: #8f2d06;   /* active/pressed state for primary CTA */
+  --color-orange-edge: #4d1903;   /* work-phase vignette / body bg behind orange screens */
   --color-parchment:   #f5efe6;   /* info/welcome overlay background */
   --color-green:       #235a39;   /* retest mode bg, toggle active, stat retest btn */
+  --color-green-dark:  #0d2a1a;   /* dark forest green — retest mode bg edge / deep green surfaces */
+  --color-blue-break:  #141560;   /* micro-break phase bg (meditative blue) */
+  --color-blue-break-dark: #080928; /* micro-break vignette edge */
+
+  /* Dark-mode surfaces */
+  --color-bg-dark:     #0d0d0d;   /* base body bg / ready-phase edge */
+  --color-bg-surface:  #1e1e1e;   /* primary dark surface */
+  --color-bg-panel:    #1a1a1a;   /* elevated panel (settings, drawers) */
 
   /* Text */
   --color-text-dark:  #2a2018;    /* primary dark text on parchment */
   --color-text-muted: rgba(0,0,0,0.45);
+  --color-warm-text:  #e8d5b0;    /* warm cream text on dark backgrounds */
 
   /* Fonts */
-  --font: 'Inconsolata', monospace;
+  --font:         'Inconsolata', monospace;  /* primary — all UI text */
+  --font-numeric: 'Nunito', sans-serif;      /* numeric displays (timer, scores) */
 }

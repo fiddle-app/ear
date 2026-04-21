@@ -1,6 +1,8 @@
 'use strict';
 // BACKGROUND COLOR SYNC (keeps Safari bottom bar in sync)
 // ══════════════════════════════════════════════════════
+// Callers use design-token values: --color-orange-edge (#4d1903), --color-green-dark (#0d2a1a),
+//   --color-bg-panel (#1a1a1a), --color-parchment (#f5efe6)
 function setBg(color) {
 $('bg-fill').style.backgroundColor = color;
 document.body.style.backgroundColor = color;
