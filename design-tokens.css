@@ -1,6 +1,6 @@
 /* Fiddle App Family — Shared Design Tokens
    Canonical source: fiddle/_shared/design/design-tokens.css
-   DO NOT edit per-app copies directly — edit here, then run sync-tokens.sh. */
+   DO NOT edit per-app copies directly — edit here, then run sync-shared.sh. */
 
 :root {
   /* Primary palette */
