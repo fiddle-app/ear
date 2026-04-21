@@ -125,17 +125,17 @@
       <div class="s-row">
         <div><div class="s-label">Lowest Note</div><div class="s-sub">The lowest note that will be tested</div></div>
         <div class="s-stepper">
-          <button class="step-btn" onclick="adjustSetting('lowestNote',-1)">−</button>
+          <button class="step-btn" onclick="adjustSetting('lowestNote',-1)" aria-label="Decrease lowest note">−</button>
           <div class="s-val" id="s-lowest">G3</div>
-          <button class="step-btn" onclick="adjustSetting('lowestNote',+1)">+</button>
+          <button class="step-btn" onclick="adjustSetting('lowestNote',+1)" aria-label="Increase lowest note">+</button>
         </div>
       </div>
       <div class="s-row">
         <div><div class="s-label">Highest Note</div><div class="s-sub">The highest note that will be tested</div></div>
         <div class="s-stepper">
-          <button class="step-btn" onclick="adjustSetting('highestNote',-1)">−</button>
+          <button class="step-btn" onclick="adjustSetting('highestNote',-1)" aria-label="Decrease highest note">−</button>
           <div class="s-val" id="s-highest">D6</div>
-          <button class="step-btn" onclick="adjustSetting('highestNote',+1)">+</button>
+          <button class="step-btn" onclick="adjustSetting('highestNote',+1)" aria-label="Increase highest note">+</button>
         </div>
       </div>
 
@@ -144,17 +144,17 @@
         <div><div class="s-label">Starting Difference</div><div class="s-sub">The initial difference in notes</div></div>
         <div class="s-stepper">
           <!-- Reversed: + button = harder (fewer cents), − button = easier (more cents) -->
-          <button class="step-btn" onclick="adjustSetting('startCentsIdx',+1)">−</button>
+          <button class="step-btn" onclick="adjustSetting('startCentsIdx',+1)" aria-label="Decrease starting difference (harder)">−</button>
           <div class="s-val" id="s-start-cents">50¢</div>
-          <button class="step-btn" onclick="adjustSetting('startCentsIdx',-1)">+</button>
+          <button class="step-btn" onclick="adjustSetting('startCentsIdx',-1)" aria-label="Increase starting difference (easier)">+</button>
         </div>
       </div>
       <div class="s-row">
         <div><div class="s-label">Tests per Round</div><div class="s-sub">Correct tests needed to advance</div></div>
         <div class="s-stepper">
-          <button class="step-btn" onclick="adjustSetting('testsPerRound',-1)">−</button>
+          <button class="step-btn" onclick="adjustSetting('testsPerRound',-1)" aria-label="Decrease tests per round">−</button>
           <div class="s-val" id="s-tests-per-round">3</div>
-          <button class="step-btn" onclick="adjustSetting('testsPerRound',+1)">+</button>
+          <button class="step-btn" onclick="adjustSetting('testsPerRound',+1)" aria-label="Increase tests per round">+</button>
         </div>
       </div>
 
@@ -162,9 +162,9 @@
       <div class="s-row">
         <div><div class="s-label">Duration</div><div class="s-sub">Length of each note</div></div>
         <div class="s-stepper">
-          <button class="step-btn" onclick="adjustSetting('noteDurIdx',-1)">−</button>
+          <button class="step-btn" onclick="adjustSetting('noteDurIdx',-1)" aria-label="Decrease note duration">−</button>
           <div class="s-val" id="s-note-dur">2.2s</div>
-          <button class="step-btn" onclick="adjustSetting('noteDurIdx',+1)">+</button>
+          <button class="step-btn" onclick="adjustSetting('noteDurIdx',+1)" aria-label="Increase note duration">+</button>
         </div>
       </div>
 
@@ -172,17 +172,17 @@
       <div class="s-row">
         <div><div class="s-label">Attack</div><div class="s-sub">How quickly the note rises</div></div>
         <div class="s-stepper">
-          <button class="step-btn" onclick="adjustSetting('attack',-1)">−</button>
+          <button class="step-btn" onclick="adjustSetting('attack',-1)" aria-label="Decrease attack">−</button>
           <div class="s-val" id="s-attack">Med</div>
-          <button class="step-btn" onclick="adjustSetting('attack',+1)">+</button>
+          <button class="step-btn" onclick="adjustSetting('attack',+1)" aria-label="Increase attack">+</button>
         </div>
       </div>
       <div class="s-row">
         <div><div class="s-label">Decay</div><div class="s-sub">How gradually the note fades</div></div>
         <div class="s-stepper">
-          <button class="step-btn" onclick="adjustSetting('decay',-1)">−</button>
+          <button class="step-btn" onclick="adjustSetting('decay',-1)" aria-label="Decrease decay">−</button>
           <div class="s-val" id="s-decay">Med</div>
-          <button class="step-btn" onclick="adjustSetting('decay',+1)">+</button>
+          <button class="step-btn" onclick="adjustSetting('decay',+1)" aria-label="Increase decay">+</button>
         </div>
       </div>
 

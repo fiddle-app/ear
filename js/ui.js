@@ -486,34 +486,48 @@ const avg   = scored.reduce((s, n) => s + stats[n.name].bestCents, 0) / scored.l
 const worst = Math.max(...scored.map(n => stats[n.name].bestCents));
 
 const introText = 'These are my Ear Tuner scores. Each score is the smallest pitch gap I can reliably hear at that note\u2019s frequency, measured in cents (hundredths of a semitone). Lower is better. Check out https://fiddle-app.github.io/ear to test your own aural acuity.';
-const introHtml = introText.replace('https://fiddle-app.github.io/ear', '<a href="https://fiddle-app.github.io/ear" style="color:#7a2900;">https://fiddle-app.github.io/ear</a>');
+const introHtml = introText.replace('https://fiddle-app.github.io/ear', '<a class="et-link" href="https://fiddle-app.github.io/ear" style="color:#8f2d06;">https://fiddle-app.github.io/ear</a>');
 
 const rows = scored.map(n => {
   const c   = stats[n.name].bestCents;
   const pct = Math.round((c / worst) * 100);
   return `<tr>
-    <td style="font-weight:600;padding:4px 12px 4px 0;border-bottom:1px solid rgba(0,0,0,0.07);width:52px;">${dn(n.name)}</td>
-    <td style="font-weight:600;color:#7a2900;padding:4px 12px 4px 0;border-bottom:1px solid rgba(0,0,0,0.07);width:48px;">${fmtC(c)}</td>
-    <td style="width:100%;padding:4px 0 4px 4px;border-bottom:1px solid rgba(0,0,0,0.07);vertical-align:middle;">
-      <div style="background:rgba(0,0,0,0.07);border-radius:3px;height:8px;width:100%;">
-        <div style="background:#b83c08;border-radius:3px;height:8px;width:${pct}%;"></div>
+    <td class="et-note" style="font-size:14px;font-weight:600;padding:4px 12px 4px 0;border-bottom:1px solid rgba(0,0,0,0.07);width:52px;">${dn(n.name)}</td>
+    <td class="et-score" style="font-size:14px;font-weight:600;color:#8f2d06;padding:4px 12px 4px 0;border-bottom:1px solid rgba(0,0,0,0.07);width:48px;">${fmtC(c)}</td>
+    <td style="font-size:14px;width:100%;padding:4px 0 4px 4px;border-bottom:1px solid rgba(0,0,0,0.07);vertical-align:middle;">
+      <div class="et-bar-track" style="background:rgba(0,0,0,0.07);border-radius:3px;height:8px;width:100%;">
+        <div class="et-bar-fill" style="background:#b83c08;border-radius:3px;height:8px;width:${pct}%;"></div>
       </div>
     </td>
   </tr>`;
 }).join('');
 
-const html = `<div style="font-family:'Inconsolata',monospace,sans-serif;color:#2a2018;font-size:15px;">
-  <p style="color:#444;font-size:14px;line-height:1.65;margin:0 0 16px;">${introHtml}</p>
-  <div style="background:rgba(180,60,20,0.10);border-left:3px solid #b83c08;padding:8px 14px;border-radius:0 6px 6px 0;margin-bottom:18px;font-size:14px;color:#7a2900;font-weight:600;display:inline-block;">Average score: ${avg.toFixed(1)}\u00a2</div>
+const html = `<style>
+  @media (prefers-color-scheme: dark) {
+    .et-wrap  { background-color:#1c1c1e !important; color:#e8ddd0 !important; }
+    .et-intro { color:#c8bfb5 !important; }
+    .et-link  { color:#e87a50 !important; }
+    .et-avg   { background:rgba(184,60,8,0.25) !important; border-left-color:#e87a50 !important; color:#f0a080 !important; }
+    .et-note  { color:#e8ddd0 !important; border-bottom-color:rgba(255,255,255,0.08) !important; }
+    .et-score { color:#f0a080 !important; border-bottom-color:rgba(255,255,255,0.08) !important; }
+    .et-bar-track { background:rgba(255,255,255,0.12) !important; }
+    .et-bar-fill  { background:#e87a50 !important; }
+    .et-footer    { color:rgba(255,255,255,0.35) !important; }
+    .et-th { color:rgba(255,255,255,0.38) !important; border-bottom-color:rgba(255,255,255,0.15) !important; }
+  }
+</style>
+<div class="et-wrap" style="font-family:'Inconsolata',monospace,sans-serif;color:#2a2018;font-size:15px;">
+  <p class="et-intro" style="color:#2a2018;font-size:14px;line-height:1.65;margin:0 0 16px;">${introHtml}</p>
+  <div class="et-avg" style="background:rgba(184,60,8,0.12);border-left:3px solid #b83c08;padding:8px 14px;border-radius:0 6px 6px 0;margin-bottom:18px;font-size:14px;color:#8f2d06;font-weight:600;display:inline-block;">Average score: ${avg.toFixed(1)}\u00a2</div>
   <table style="border-collapse:collapse;width:100%;max-width:440px;">
     <thead><tr>
-      <th style="font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(0,0,0,0.38);text-align:left;padding:0 12px 6px 0;border-bottom:2px solid rgba(0,0,0,0.15);font-weight:600;">Note</th>
-      <th style="font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(0,0,0,0.38);text-align:left;padding:0 12px 6px 0;border-bottom:2px solid rgba(0,0,0,0.15);font-weight:600;">Score</th>
-      <th style="width:100%;border-bottom:2px solid rgba(0,0,0,0.15);padding-bottom:6px;"> </th>
+      <th class="et-th" style="font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(0,0,0,0.38);text-align:left;padding:0 12px 6px 0;border-bottom:2px solid rgba(0,0,0,0.15);font-weight:600;">Note</th>
+      <th class="et-th" style="font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(0,0,0,0.38);text-align:left;padding:0 12px 6px 0;border-bottom:2px solid rgba(0,0,0,0.15);font-weight:600;">Score</th>
+      <th class="et-th" style="width:100%;border-bottom:2px solid rgba(0,0,0,0.15);padding-bottom:6px;"> </th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>
-  <p style="margin-top:14px;font-size:12px;color:rgba(0,0,0,0.35);">Ear Tuner \u00b7 fiddle-app.github.io/ear</p>
+  <p class="et-footer" style="margin-top:14px;font-size:12px;color:rgba(0,0,0,0.35);">Ear Tuner \u00b7 fiddle-app.github.io/ear</p>
 </div>`;
 
 const noteColW = Math.max(...scored.map(n => dn(n.name).length));
