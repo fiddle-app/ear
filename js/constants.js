@@ -30,7 +30,7 @@ const VOICE_GAIN = {
 // ══════════════════════════════════════════════════════
 // CONSTANTS
 // ══════════════════════════════════════════════════════
-const BUILD_DATE  = '2026-04-22 04:18';   // stamped by deploy.sh — do not edit manually
+const BUILD_DATE  = '2026-04-22 00:21';   // stamped by deploy.sh — do not edit manually
 const CENTS_SEQ   = [100, 50, 25, 20, 15, 10, 7, 6, 5, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, 1.5, 1.0, 0.5];
 const MAX_CENTS   = CENTS_SEQ[0]; // 100 — largest/easiest difference
 const fmtC        = c => Number.isInteger(c) ? c+'¢' : c.toFixed(1)+'¢'; // format cents value
