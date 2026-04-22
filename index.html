@@ -16,6 +16,57 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div style="display:none">
+<svg xmlns="http://www.w3.org/2000/svg">
+  <symbol id="sym-play" viewBox="0 0 68 68">
+    <circle cx="34" cy="34" r="32" stroke="currentColor" stroke-width="2" fill="none" fill-opacity="0.09"/>
+    <path d="M26 20 L50 34 L26 48 Z" fill="currentColor"/>
+  </symbol>
+  <symbol id="sym-pause" viewBox="0 0 68 68">
+    <circle cx="34" cy="34" r="32" stroke="currentColor" stroke-width="2" fill="none" fill-opacity="0.09"/>
+    <rect x="20" y="19" width="10" height="30" rx="3" fill="currentColor"/>
+    <rect x="38" y="19" width="10" height="30" rx="3" fill="currentColor"/>
+  </symbol>
+  <symbol id="sym-skip-back" viewBox="0 0 46 46">
+    <rect x="7" y="11" width="5" height="24" rx="2" fill="currentColor"/>
+    <path d="M38 11 L16 23 L38 35 Z" fill="currentColor"/>
+  </symbol>
+  <symbol id="sym-skip-forward" viewBox="0 0 46 46">
+    <path d="M8 11 L30 23 L8 35 Z" fill="currentColor"/>
+    <rect x="34" y="11" width="5" height="24" rx="2" fill="currentColor"/>
+  </symbol>
+  <symbol id="sym-waveform" viewBox="0 0 96 22">
+    <rect x="0" y="10" width="2.5" height="2" rx="1.25" fill="currentColor" fill-opacity="0.10"/>
+    <rect x="4" y="8" width="2.5" height="6" rx="1.25" fill="currentColor" fill-opacity="0.20"/>
+    <rect x="8" y="5" width="2.5" height="12" rx="1.25" fill="currentColor" fill-opacity="0.35"/>
+    <rect x="12" y="2" width="2.5" height="18" rx="1.25" fill="currentColor" fill-opacity="0.55"/>
+    <rect x="16" y="0" width="2.5" height="22" rx="1.25" fill="currentColor" fill-opacity="0.78"/>
+    <rect x="20" y="1" width="2.5" height="20" rx="1.25" fill="currentColor" fill-opacity="1.00"/>
+    <rect x="24" y="3" width="2.5" height="16" rx="1.25" fill="currentColor" fill-opacity="0.82"/>
+    <rect x="28" y="6" width="2.5" height="10" rx="1.25" fill="currentColor" fill-opacity="0.62"/>
+    <rect x="32" y="8" width="2.5" height="6" rx="1.25" fill="currentColor" fill-opacity="0.42"/>
+    <rect x="36" y="6" width="2.5" height="10" rx="1.25" fill="currentColor" fill-opacity="0.48"/>
+    <rect x="40" y="1" width="2.5" height="20" rx="1.25" fill="currentColor" fill-opacity="0.72"/>
+    <rect x="44" y="0" width="2.5" height="22" rx="1.25" fill="currentColor" fill-opacity="0.95"/>
+    <rect x="48" y="3" width="2.5" height="16" rx="1.25" fill="currentColor" fill-opacity="0.82"/>
+    <rect x="52" y="6" width="2.5" height="10" rx="1.25" fill="currentColor" fill-opacity="0.58"/>
+    <rect x="56" y="4" width="2.5" height="14" rx="1.25" fill="currentColor" fill-opacity="0.68"/>
+    <rect x="60" y="1" width="2.5" height="20" rx="1.25" fill="currentColor" fill-opacity="0.88"/>
+    <rect x="64" y="3" width="2.5" height="16" rx="1.25" fill="currentColor" fill-opacity="0.78"/>
+    <rect x="68" y="5" width="2.5" height="12" rx="1.25" fill="currentColor" fill-opacity="0.58"/>
+    <rect x="72" y="8" width="2.5" height="6" rx="1.25" fill="currentColor" fill-opacity="0.38"/>
+    <rect x="76" y="6" width="2.5" height="10" rx="1.25" fill="currentColor" fill-opacity="0.42"/>
+    <rect x="80" y="8" width="2.5" height="6" rx="1.25" fill="currentColor" fill-opacity="0.26"/>
+    <rect x="84" y="9" width="2.5" height="4" rx="1.25" fill="currentColor" fill-opacity="0.16"/>
+    <rect x="88" y="10" width="2.5" height="2" rx="1.25" fill="currentColor" fill-opacity="0.08"/>
+    <rect x="92" y="10" width="2.5" height="2" rx="1.25" fill="currentColor" fill-opacity="0.04"/>
+  </symbol>
+  <symbol id="sym-replay" viewBox="-10 25 1220 1220">
+    <path d="m529.2 441.6c-30-18-69.602 3.6016-69.602 39.602v318c0 36 38.398 57.602 69.602 39.602l262.8-158.4c28.801-18 28.801-60 0-78z" fill="currentColor"/>
+    <path d="m1053.6 362.4c-19.199-30-58.801-40.801-88.801-21.602-31.199 19.199-40.801 58.801-21.602 91.199 43.199 70.801 64.801 157.2 56.398 248.4-19.199 193.2-177.6 346.8-372 360-235.2 15.602-430.8-171.6-428.4-404.4 2.3984-216 178.8-393.6 393.6-397.2 12 0 22.801 0 34.801 1.1992v50.398c0 20.398 22.801 32.398 39.602 21.602l187.2-116.4c15.602-9.6016 15.602-33.602 0-43.199l-188.4-118.8c-16.801-10.801-39.602 1.1992-39.602 21.602v52.801c-8.3984-0.003906-16.797-0.003906-26.398-0.003906-306 0-553.2 260.4-529.2 571.2 19.199 260.4 229.2 470.4 488.4 489.6 310.8 22.801 572.4-223.2 572.4-529.2 0.003906-102-28.797-196.8-77.996-277.2z" fill="currentColor"/>
+  </symbol>
+</svg>
+</div>
 <div id="bg-fill"></div>
 
 <!-- ═══ MAIN APP ═══ -->
@@ -48,9 +99,8 @@
     </div>
     <!-- Replay button: center aligned with bottom of note circles -->
     <button id="replay-btn" onclick="replayBoth()" aria-label="Replay" style="margin-top:0;">
-      <svg width="48" height="48" viewBox="-10 25 1220 1220" fill="rgba(255,255,255,0.75)" xmlns="http://www.w3.org/2000/svg">
-        <path d="m529.2 441.6c-30-18-69.602 3.6016-69.602 39.602v318c0 36 38.398 57.602 69.602 39.602l262.8-158.4c28.801-18 28.801-60 0-78z"/>
-        <path d="m1053.6 362.4c-19.199-30-58.801-40.801-88.801-21.602-31.199 19.199-40.801 58.801-21.602 91.199 43.199 70.801 64.801 157.2 56.398 248.4-19.199 193.2-177.6 346.8-372 360-235.2 15.602-430.8-171.6-428.4-404.4 2.3984-216 178.8-393.6 393.6-397.2 12 0 22.801 0 34.801 1.1992v50.398c0 20.398 22.801 32.398 39.602 21.602l187.2-116.4c15.602-9.6016 15.602-33.602 0-43.199l-188.4-118.8c-16.801-10.801-39.602 1.1992-39.602 21.602v52.801c-8.3984-0.003906-16.797-0.003906-26.398-0.003906-306 0-553.2 260.4-529.2 571.2 19.199 260.4 229.2 470.4 488.4 489.6 310.8 22.801 572.4-223.2 572.4-529.2 0.003906-102-28.797-196.8-77.996-277.2z"/>
+      <svg width="48" height="48" viewBox="-10 25 1220 1220" fill="none" style="color:rgba(255,255,255,0.75)">
+        <use href="#sym-replay"/>
       </svg>
     </button>
     <!-- Start button shown before first round -->
