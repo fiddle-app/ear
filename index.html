@@ -8,7 +8,14 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Ear Tuner">
 <meta name="theme-color" id="meta-theme" content="#b83c08">
-<link rel="apple-touch-icon" sizes="180x180" id="apple-touch-icon">
+<!-- PWA home-screen icon. MUST be a real PNG file reference — iOS Safari
+     "Add to Home Screen" does not reliably accept data: URLs or JS-generated
+     canvas icons. If you change this, test on iPad Safari: Share → Add to
+     Home Screen → confirm the icon appears on the home screen (not just in
+     the share-sheet preview). Regenerate the PNG from resources/app-icon.svg
+     via the svg-to-png skill. See _shared/design/Fiddle-Apps-Design-Intent.md
+     §PWA Home-Screen Icon. -->
+<link rel="apple-touch-icon" sizes="180x180" href="resources/app-icon-180.png">
 <title>Ear Tuner</title>
 <link rel="stylesheet" href="fonts/fonts.css">
 <link rel="stylesheet" href="design-tokens.css">
@@ -292,7 +299,7 @@
 <div id="welcome-overlay" class="overlay">
   <div id="welcome-content">
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:4px;">
-      <img id="welcome-app-icon" width="60" height="60" style="border-radius:13px;flex-shrink:0;" alt="Ear Tuner icon"/>
+      <img id="welcome-app-icon" src="resources/app-icon-180.png" width="60" height="60" style="border-radius:13px;flex-shrink:0;" alt="Ear Tuner icon"/>
       <div>
         <div style="font-size:clamp(20px,6vw,26px);font-weight:600;letter-spacing:0.04em;color:#1a1008;">Ear Tuner</div>
         <div style="font-size:clamp(11px,3vw,13px);color:rgba(0,0,0,0.40);letter-spacing:0.06em;margin-top:2px;">ear training for musicians</div>
@@ -322,7 +329,7 @@
   <div id="info-content">
     <!-- App icon + name header -->
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:4px;">
-      <img id="info-app-icon" width="60" height="60" style="border-radius:13px;flex-shrink:0;" alt="Ear Tuner icon"/>
+      <img id="info-app-icon" src="resources/app-icon-180.png" width="60" height="60" style="border-radius:13px;flex-shrink:0;" alt="Ear Tuner icon"/>
       <div>
         <div style="font-size:clamp(20px,6vw,26px);font-weight:600;letter-spacing:0.04em;color:#1a1008;">Ear Tuner</div>
         <div style="font-size:clamp(11px,3vw,13px);color:rgba(0,0,0,0.40);letter-spacing:0.06em;margin-top:2px;">ear training for musicians</div>

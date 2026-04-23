@@ -1,7 +1,7 @@
 // Ear Tuner — Service Worker
 // Pre-caches the app shell; runtime-caches sound samples.
 
-const CACHE_VER    = '2026-04-22 21:10';  // stamped by deploy.sh — do not edit manually
+const CACHE_VER    = '2026-04-23 18:33';  // stamped by deploy.sh — do not edit manually
 const STATIC_CACHE = `ear-tuner-static-${CACHE_VER}`;
 const FONT_CACHE   = 'ear-tuner-fonts';
 const SOUND_CACHE  = 'ear-tuner-sounds';
@@ -23,6 +23,7 @@ const PRECACHE = [
   '/ear/js/render.js',
   '/ear/js/ui.js',
   '/ear/js/boot.js',
+  '/ear/resources/app-icon-180.png',
 ];
 
 // ── Install: pre-cache app shell ──────────────────────────────────────────────
