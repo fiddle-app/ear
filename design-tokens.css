@@ -11,6 +11,7 @@
   --color-parchment:   #f5efe6;   /* info/welcome overlay background */
   --color-green:       #235a39;   /* retest mode bg, toggle active, stat retest btn */
   --color-green-dark:  #0d2a1a;   /* dark forest green — retest mode bg edge / deep green surfaces */
+  --color-green-light: #4d9966;   /* mid green — foreground/icon/text on dark surfaces (e.g. settings close icon, log-action feedback). Matches ear-tuner's settings-done checkmark. */
   --color-blue-break:  #141560;   /* micro-break phase bg (meditative blue) */
   --color-blue-break-dark: #080928; /* micro-break vignette edge */
 
