@@ -1,29 +1,32 @@
 // Ear Tuner — Service Worker
 // Pre-caches the app shell; runtime-caches sound samples.
 
-const CACHE_VER    = '2026-04-25 09:49';  // stamped by deploy.sh — do not edit manually
+const CACHE_VER    = '2026-04-25 10:40';  // stamped by deploy.sh — do not edit manually
 const STATIC_CACHE = `ear-tuner-static-${CACHE_VER}`;
 const FONT_CACHE   = 'ear-tuner-fonts';
 const SOUND_CACHE  = 'ear-tuner-sounds';
 
+// Paths are relative to this sw.js file. In prod (sw.js at /ear/sw.js) they
+// resolve under /ear/; in dev (sw.js at /sw.js) they resolve under root.
+// One set of strings works for both.
 const PRECACHE = [
-  '/ear/',
-  '/ear/index.html',
-  '/ear/style.css',
-  '/ear/soundfont-player.min.js',
-  '/ear/fonts/fonts.css',
-  '/ear/fonts/inconsolata-latin.woff2',
-  '/ear/fonts/nunito-latin.woff2',
-  '/ear/js/constants.js',
-  '/ear/js/persistence.js',
-  '/ear/js/log.js',
-  '/ear/js/audio-ctx.js',
-  '/ear/js/audio.js',
-  '/ear/js/game.js',
-  '/ear/js/render.js',
-  '/ear/js/ui.js',
-  '/ear/js/boot.js',
-  '/ear/resources/app-icon-180.png',
+  './',
+  'index.html',
+  'style.css',
+  'soundfont-player.min.js',
+  'fonts/fonts.css',
+  'fonts/inconsolata-latin.woff2',
+  'fonts/nunito-latin.woff2',
+  'js/constants.js',
+  'js/persistence.js',
+  'js/log.js',
+  'js/audio-ctx.js',
+  'js/audio.js',
+  'js/game.js',
+  'js/render.js',
+  'js/ui.js',
+  'js/boot.js',
+  'resources/app-icon-180.png',
 ];
 
 // ── Install: pre-cache app shell ──────────────────────────────────────────────

@@ -82,5 +82,21 @@ if (s.type === 'sf') {
 // skill. See research/pwa-home-screen-icon-plan.md.
 
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/ear/sw.js');
+  // In dev, the cache key in sw.js is `ear-tuner-static-%%BUILD_DATE%%`
+  // — the placeholder is only stamped at deploy time, so the cache name
+  // is stable across dev sessions and an old SW will happily serve
+  // stale CSS/JS forever. Auto-unregister any existing SW when running
+  // on localhost; only register a real SW in prod.
+  //
+  // To test SW behavior locally, deploy to a real origin (or flip the
+  // isDev check below).
+  const isDev = location.hostname === 'localhost' ||
+                location.hostname === '127.0.0.1';
+  if (isDev) {
+    navigator.serviceWorker.getRegistrations()
+      .then(regs => regs.forEach(r => r.unregister()));
+  } else {
+    // Relative path so it resolves at fiddle-app.github.io/ear/sw.js.
+    navigator.serviceWorker.register('sw.js');
+  }
 }

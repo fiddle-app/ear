@@ -5,6 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no, maximum-scale=1.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Ear Tuner">
 <meta name="theme-color" id="meta-theme" content="#b83c08">
@@ -16,6 +17,7 @@
      via the svg-to-png skill. See _shared/design/Fiddle-Apps-Design-Intent.md
      §PWA Home-Screen Icon. -->
 <link rel="apple-touch-icon" sizes="180x180" href="resources/app-icon-180.png">
+<link rel="icon" type="image/png" href="resources/app-icon-180.png">
 <title>Ear Tuner</title>
 <link rel="stylesheet" href="fonts/fonts.css">
 <link rel="stylesheet" href="design-tokens.css">
@@ -23,57 +25,32 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div style="display:none">
-<svg xmlns="http://www.w3.org/2000/svg">
-  <symbol id="sym-play" viewBox="0 0 68 68">
-    <circle cx="34" cy="34" r="32" stroke="currentColor" stroke-width="2" fill="none" fill-opacity="0.09"/>
-    <path d="M26 20 L50 34 L26 48 Z" fill="currentColor"/>
+
+<!-- SPRITE-INLINE -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <symbol id="icon-close-x" viewBox="0 0 34 34">
+    <circle cx="17" cy="17" r="15" stroke="currentColor" stroke-width="1.8" fill="none"/>
+      <path d="M11 11 L23 23 M23 11 L11 23" stroke="currentColor"
+            stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
   </symbol>
-  <symbol id="sym-pause" viewBox="0 0 68 68">
-    <circle cx="34" cy="34" r="32" stroke="currentColor" stroke-width="2" fill="none" fill-opacity="0.09"/>
-    <rect x="20" y="19" width="10" height="30" rx="3" fill="currentColor"/>
-    <rect x="38" y="19" width="10" height="30" rx="3" fill="currentColor"/>
+  <symbol id="icon-gear" viewBox="0 0 100 100">
+    <path fill-rule="evenodd" clip-rule="evenodd" fill="currentColor"
+        d="M88 42h-5.8a33 33 0 0 0-3-7.2l4.1-4.1a4 4 0 0 0 0-5.6l-8.4-8.4a4 4 0 0 0-5.6 0l-4.1 4.1A33 33 0 0 0 58 17.8V12a4 4 0 0 0-4-4h-8a4 4 0 0 0-4 4v5.8a33 33 0 0 0-7.2 3l-4.1-4.1a4 4 0 0 0-5.6 0l-8.4 8.4a4 4 0 0 0 0 5.6l4.1 4.1A33 33 0 0 0 17.8 42H12a4 4 0 0 0-4 4v8a4 4 0 0 0 4 4h5.8a33 33 0 0 0 3 7.2l-4.1 4.1a4 4 0 0 0 0 5.6l8.4 8.4a4 4 0 0 0 5.6 0l4.1-4.1a33 33 0 0 0 7.2 3V88a4 4 0 0 0 4 4h8a4 4 0 0 0 4-4v-5.8a33 33 0 0 0 7.2-3l4.1 4.1a4 4 0 0 0 5.6 0l8.4-8.4a4 4 0 0 0 0-5.6l-4.1-4.1a33 33 0 0 0 3-7.2H88a4 4 0 0 0 4-4v-8a4 4 0 0 0-4-4z
+           M50 35a15 15 0 1 0 0 30 15 15 0 0 0 0-30z"/>
+      <circle cx="50" cy="50" r="10" fill="currentColor"/>
   </symbol>
-  <symbol id="sym-skip-back" viewBox="0 0 46 46">
-    <rect x="7" y="11" width="5" height="24" rx="2" fill="currentColor"/>
-    <path d="M38 11 L16 23 L38 35 Z" fill="currentColor"/>
+  <symbol id="icon-info-i" viewBox="0 0 38 38">
+    <circle cx="19" cy="19" r="17" stroke="currentColor" stroke-width="1.8" fill="none"/>
+      <text x="19" y="26.5" text-anchor="middle" font-family="Georgia, serif"
+            font-size="21.6" font-style="italic" fill="currentColor">i</text>
   </symbol>
-  <symbol id="sym-skip-forward" viewBox="0 0 46 46">
-    <path d="M8 11 L30 23 L8 35 Z" fill="currentColor"/>
-    <rect x="34" y="11" width="5" height="24" rx="2" fill="currentColor"/>
-  </symbol>
-  <symbol id="sym-waveform" viewBox="0 0 96 22">
-    <rect x="0" y="10" width="2.5" height="2" rx="1.25" fill="currentColor" fill-opacity="0.10"/>
-    <rect x="4" y="8" width="2.5" height="6" rx="1.25" fill="currentColor" fill-opacity="0.20"/>
-    <rect x="8" y="5" width="2.5" height="12" rx="1.25" fill="currentColor" fill-opacity="0.35"/>
-    <rect x="12" y="2" width="2.5" height="18" rx="1.25" fill="currentColor" fill-opacity="0.55"/>
-    <rect x="16" y="0" width="2.5" height="22" rx="1.25" fill="currentColor" fill-opacity="0.78"/>
-    <rect x="20" y="1" width="2.5" height="20" rx="1.25" fill="currentColor" fill-opacity="1.00"/>
-    <rect x="24" y="3" width="2.5" height="16" rx="1.25" fill="currentColor" fill-opacity="0.82"/>
-    <rect x="28" y="6" width="2.5" height="10" rx="1.25" fill="currentColor" fill-opacity="0.62"/>
-    <rect x="32" y="8" width="2.5" height="6" rx="1.25" fill="currentColor" fill-opacity="0.42"/>
-    <rect x="36" y="6" width="2.5" height="10" rx="1.25" fill="currentColor" fill-opacity="0.48"/>
-    <rect x="40" y="1" width="2.5" height="20" rx="1.25" fill="currentColor" fill-opacity="0.72"/>
-    <rect x="44" y="0" width="2.5" height="22" rx="1.25" fill="currentColor" fill-opacity="0.95"/>
-    <rect x="48" y="3" width="2.5" height="16" rx="1.25" fill="currentColor" fill-opacity="0.82"/>
-    <rect x="52" y="6" width="2.5" height="10" rx="1.25" fill="currentColor" fill-opacity="0.58"/>
-    <rect x="56" y="4" width="2.5" height="14" rx="1.25" fill="currentColor" fill-opacity="0.68"/>
-    <rect x="60" y="1" width="2.5" height="20" rx="1.25" fill="currentColor" fill-opacity="0.88"/>
-    <rect x="64" y="3" width="2.5" height="16" rx="1.25" fill="currentColor" fill-opacity="0.78"/>
-    <rect x="68" y="5" width="2.5" height="12" rx="1.25" fill="currentColor" fill-opacity="0.58"/>
-    <rect x="72" y="8" width="2.5" height="6" rx="1.25" fill="currentColor" fill-opacity="0.38"/>
-    <rect x="76" y="6" width="2.5" height="10" rx="1.25" fill="currentColor" fill-opacity="0.42"/>
-    <rect x="80" y="8" width="2.5" height="6" rx="1.25" fill="currentColor" fill-opacity="0.26"/>
-    <rect x="84" y="9" width="2.5" height="4" rx="1.25" fill="currentColor" fill-opacity="0.16"/>
-    <rect x="88" y="10" width="2.5" height="2" rx="1.25" fill="currentColor" fill-opacity="0.08"/>
-    <rect x="92" y="10" width="2.5" height="2" rx="1.25" fill="currentColor" fill-opacity="0.04"/>
-  </symbol>
-  <symbol id="sym-replay" viewBox="-10 25 1220 1220">
+  <symbol id="icon-replay" viewBox="-10 25 1220 1220">
     <path d="m529.2 441.6c-30-18-69.602 3.6016-69.602 39.602v318c0 36 38.398 57.602 69.602 39.602l262.8-158.4c28.801-18 28.801-60 0-78z" fill="currentColor"/>
-    <path d="m1053.6 362.4c-19.199-30-58.801-40.801-88.801-21.602-31.199 19.199-40.801 58.801-21.602 91.199 43.199 70.801 64.801 157.2 56.398 248.4-19.199 193.2-177.6 346.8-372 360-235.2 15.602-430.8-171.6-428.4-404.4 2.3984-216 178.8-393.6 393.6-397.2 12 0 22.801 0 34.801 1.1992v50.398c0 20.398 22.801 32.398 39.602 21.602l187.2-116.4c15.602-9.6016 15.602-33.602 0-43.199l-188.4-118.8c-16.801-10.801-39.602 1.1992-39.602 21.602v52.801c-8.3984-0.003906-16.797-0.003906-26.398-0.003906-306 0-553.2 260.4-529.2 571.2 19.199 260.4 229.2 470.4 488.4 489.6 310.8 22.801 572.4-223.2 572.4-529.2 0.003906-102-28.797-196.8-77.996-277.2z" fill="currentColor"/>
+      <path d="m1053.6 362.4c-19.199-30-58.801-40.801-88.801-21.602-31.199 19.199-40.801 58.801-21.602 91.199 43.199 70.801 64.801 157.2 56.398 248.4-19.199 193.2-177.6 346.8-372 360-235.2 15.602-430.8-171.6-428.4-404.4 2.3984-216 178.8-393.6 393.6-397.2 12 0 22.801 0 34.801 1.1992v50.398c0 20.398 22.801 32.398 39.602 21.602l187.2-116.4c15.602-9.6016 15.602-33.602 0-43.199l-188.4-118.8c-16.801-10.801-39.602 1.1992-39.602 21.602v52.801c-8.3984-0.003906-16.797-0.003906-26.398-0.003906-306 0-553.2 260.4-529.2 571.2 19.199 260.4 229.2 470.4 488.4 489.6 310.8 22.801 572.4-223.2 572.4-529.2 0.003906-102-28.797-196.8-77.996-277.2z" fill="currentColor"/>
   </symbol>
 </svg>
-</div>
+<!-- /SPRITE-INLINE -->
+
 <div id="bg-fill"></div>
 
 <!-- ═══ MAIN APP ═══ -->
@@ -107,7 +84,7 @@
     <!-- Replay button: center aligned with bottom of note circles -->
     <button id="replay-btn" onclick="replayBoth()" aria-label="Replay" style="margin-top:0;">
       <svg width="48" height="48" viewBox="-10 25 1220 1220" fill="none" style="color:rgba(255,255,255,0.75)">
-        <use href="#sym-replay"/>
+        <use href="#icon-replay"/>
       </svg>
     </button>
     <!-- Start button shown before first round -->
@@ -140,38 +117,23 @@
 <!-- Retest close button: shown top-right during retest mode -->
 
 <button id="retest-close-btn" onclick="exitRetest(true); setTimeout(startRound,100);" aria-label="Exit retest">
-  <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
-    <circle cx="17" cy="17" r="15" stroke="currentColor" stroke-width="1.8" fill="none"/>
-    <path d="M11 11 L23 23M23 11 L11 23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-  </svg>
+  <svg width="34" height="34" aria-hidden="true"><use href="#icon-close-x"/></svg>
 </button>
 
 <!-- Fixed corner buttons -->
 
 <button id="info-btn" aria-label="About" onclick="openInfo()">
-  <svg width="38" height="38" viewBox="0 0 38 38" fill="none">
-    <circle cx="19" cy="19" r="17" stroke="currentColor" stroke-width="1.8" fill="none"/>
-    <text x="19" y="26.5" text-anchor="middle" font-family="Georgia, serif"
-      font-size="21.6" font-style="italic" fill="currentColor">i</text>
-  </svg>
+  <svg width="38" height="38" aria-hidden="true"><use href="#icon-info-i"/></svg>
 </button>
 <button id="settings-btn" aria-label="Settings" onclick="openSettings()">
-  <svg width="36" height="36" viewBox="0 0 100 100" fill="none">
-    <path fill-rule="evenodd" clip-rule="evenodd" fill="currentColor"
-      d="M88 42h-5.8a33 33 0 0 0-3-7.2l4.1-4.1a4 4 0 0 0 0-5.6l-8.4-8.4a4 4 0 0 0-5.6 0l-4.1 4.1A33 33 0 0 0 58 17.8V12a4 4 0 0 0-4-4h-8a4 4 0 0 0-4 4v5.8a33 33 0 0 0-7.2 3l-4.1-4.1a4 4 0 0 0-5.6 0l-8.4 8.4a4 4 0 0 0 0 5.6l4.1 4.1A33 33 0 0 0 17.8 42H12a4 4 0 0 0-4 4v8a4 4 0 0 0 4 4h5.8a33 33 0 0 0 3 7.2l-4.1 4.1a4 4 0 0 0 0 5.6l8.4 8.4a4 4 0 0 0 5.6 0l4.1-4.1a33 33 0 0 0 7.2 3V88a4 4 0 0 0 4 4h8a4 4 0 0 0 4-4v-5.8a33 33 0 0 0 7.2-3l4.1 4.1a4 4 0 0 0 5.6 0l8.4-8.4a4 4 0 0 0 0-5.6l-4.1-4.1a33 33 0 0 0 3-7.2H88a4 4 0 0 0 4-4v-8a4 4 0 0 0-4-4z
-      M50 35a15 15 0 1 0 0 30 15 15 0 0 0 0-30z"/>
-    <circle cx="50" cy="50" r="10" fill="currentColor"/>
-  </svg>
+  <svg width="36" height="36" aria-hidden="true"><use href="#icon-gear"/></svg>
 </button>
 
 <!-- ═══ SETTINGS OVERLAY ═══ -->
 
 <div id="settings-overlay" class="overlay">
-  <button id="s-done-btn" onclick="closeSettings()">
-    <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
-      <circle cx="17" cy="17" r="15" stroke="currentColor" stroke-width="1.8" fill="none"/>
-      <path d="M10 17 L15 22 L24 12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
+  <button id="s-done-btn" onclick="closeSettings()" aria-label="Close settings">
+    <svg width="34" height="34" aria-hidden="true"><use href="#icon-close-x"/></svg>
   </button>
   <div id="settings-scroll">
     <div id="settings-inner">
@@ -309,8 +271,8 @@
     <p class="info-p"><strong>Ear Tuner</strong> plays two notes. Tap the one you think is higher.</p>
     <p class="info-p">The app quickly finds your threshold — the point where two notes are so close together you can barely tell them apart — and keeps testing you at your limits.</p>
     <p class="info-p">Research shows that this kind of targeted practice, done regularly, improves your ability to hear small pitch differences.</p>
-    <p class="info-p">Tap <button class="welcome-inline-btn" onclick="openInfo()" aria-label="Info"><svg width="22" height="22" viewBox="0 0 38 38" fill="none"><circle cx="19" cy="19" r="17" stroke="currentColor" stroke-width="1.8" fill="none"/><text x="19" y="26.5" text-anchor="middle" font-family="Georgia, serif" font-size="21.6" font-style="italic" fill="currentColor">i</text></svg></button> (lower right) to see your overall score and learn the "swipe" gestures that let you play Ear Tuner while driving or sitting in a recliner with your eyes closed.</p>
-    <p class="info-p">Tap <button class="welcome-inline-btn" onclick="openSettings()" aria-label="Settings"><svg width="20" height="20" viewBox="0 0 100 100" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" fill="currentColor" d="M88 42h-5.8a33 33 0 0 0-3-7.2l4.1-4.1a4 4 0 0 0 0-5.6l-8.4-8.4a4 4 0 0 0-5.6 0l-4.1 4.1A33 33 0 0 0 58 17.8V12a4 4 0 0 0-4-4h-8a4 4 0 0 0-4 4v5.8a33 33 0 0 0-7.2 3l-4.1-4.1a4 4 0 0 0-5.6 0l-8.4 8.4a4 4 0 0 0 0 5.6l4.1 4.1A33 33 0 0 0 17.8 42H12a4 4 0 0 0-4 4v8a4 4 0 0 0 4 4h5.8a33 33 0 0 0 3 7.2l-4.1 4.1a4 4 0 0 0 0 5.6l8.4 8.4a4 4 0 0 0 5.6 0l4.1-4.1a33 33 0 0 0 7.2 3V88a4 4 0 0 0 4 4h8a4 4 0 0 0 4-4v-5.8a33 33 0 0 0 7.2-3l4.1 4.1a4 4 0 0 0 5.6 0l8.4-8.4a4 4 0 0 0 0-5.6l-4.1-4.1a33 33 0 0 0 3-7.2H88a4 4 0 0 0 4-4v-8a4 4 0 0 0-4-4zM50 35a15 15 0 1 0 0 30 15 15 0 0 0 0-30z"/><circle cx="50" cy="50" r="10" fill="currentColor"/></svg></button> (lower left) to change the instrument or adjust other settings.</p>
+    <p class="info-p">Tap <button class="welcome-inline-btn" onclick="openInfo()" aria-label="Info"><svg width="22" height="22" aria-hidden="true"><use href="#icon-info-i"/></svg></button> (lower right) to see your overall score and learn the "swipe" gestures that let you play Ear Tuner while driving or sitting in a recliner with your eyes closed.</p>
+    <p class="info-p">Tap <button class="welcome-inline-btn" onclick="openSettings()" aria-label="Settings"><svg width="20" height="20" aria-hidden="true"><use href="#icon-gear"/></svg></button> (lower left) to change the instrument or adjust other settings.</p>
     <div class="welcome-push"></div>
     <button id="welcome-get-started" onclick="closeWelcome()">Get Started</button>
     <div class="welcome-push"></div>
@@ -320,11 +282,8 @@
 <!-- ═══ INFO OVERLAY ═══ -->
 
 <div id="info-overlay" class="overlay">
-  <button id="info-close-btn" onclick="closeInfo()">
-    <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
-      <circle cx="17" cy="17" r="15" stroke="currentColor" stroke-width="1.8" fill="none"/>
-      <path d="M11 11 L23 23M23 11 L11 23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-    </svg>
+  <button id="info-close-btn" onclick="closeInfo()" aria-label="Close info">
+    <svg width="34" height="34" aria-hidden="true"><use href="#icon-close-x"/></svg>
   </button>
   <div id="info-content">
     <!-- App icon + name header -->
@@ -387,11 +346,8 @@
     <p style="font-size:clamp(11px,3vw,13px);color:rgba(0,0,0,0.40);line-height:1.6;margin-top:4px;">
       Instrument samples from the <a href="https://github.com/gleitz/midi-js-soundfonts" target="_blank" style="color:rgba(0,0,0,0.50);">MusyngKite soundfont</a>, used under <a href="https://creativecommons.org/licenses/by-sa/3.0/" target="_blank" style="color:rgba(0,0,0,0.50);">CC BY-SA 3.0</a>.
     </p>
-    <button id="info-close-btn-bottom" onclick="closeInfo()">
-      <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
-        <circle cx="17" cy="17" r="15" stroke="currentColor" stroke-width="1.8" fill="none"/>
-        <path d="M11 11 L23 23M23 11 L11 23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-      </svg>
+    <button id="info-close-btn-bottom" onclick="closeInfo()" aria-label="Close info">
+      <svg width="34" height="34" aria-hidden="true"><use href="#icon-close-x"/></svg>
     </button>
     <div id="build-date-display" style="font-size:11px;color:rgba(0,0,0,0.25);letter-spacing:0.04em;text-align:center;margin-top:8px;font-family:monospace;"></div>
   </div>

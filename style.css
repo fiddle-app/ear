@@ -303,9 +303,16 @@ font-family: var(--font);
 #settings-overlay { background: var(--color-bg-panel); color: #fff; }
 #s-done-btn {
 position: fixed; top: calc(var(--safe-top) + 8px); right: calc(var(--safe-r) + 10px);
-background: none; border: none; color: #4d9966; cursor: pointer;
-padding: 8px; z-index: 210; -webkit-appearance: none;
+background: none; border: none; border-radius: 999px;
+color: var(--color-green-light, #4d9966);
+cursor: pointer; padding: 6px;
+z-index: 210; -webkit-appearance: none;
+display: flex; align-items: center; justify-content: center;
+transition: background 0.15s, color 0.15s;
 }
+#s-done-btn:hover  { background: rgba(77, 153, 102, 0.18); color: #7dbf95; }
+#s-done-btn:active { background: rgba(77, 153, 102, 0.30); }
+#s-done-btn svg { width: 36px; height: 36px; display: block; pointer-events: none; }
 #settings-scroll {
 flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
 padding: calc(var(--safe-top) + 58px) 0 calc(var(--safe-bot) + 24px);
