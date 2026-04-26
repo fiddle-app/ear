@@ -341,6 +341,7 @@
     <div id="info-destructive-row">
       <button id="info-global-reset" onclick="confirmResetAll()">Reset All Scores</button>
       <button id="info-fake-history" onclick="confirmRandomizeScores()">Randomize Scores</button>
+      <button id="info-import-scores" onclick="openImportScores()">Import Scores</button>
     </div>
 
     <p style="font-size:clamp(11px,3vw,13px);color:rgba(0,0,0,0.40);line-height:1.6;margin-top:4px;">
@@ -362,6 +363,21 @@
     <div id="confirm-btns">
       <button id="confirm-yes">Yes, Reset</button>
       <button id="confirm-no" onclick="closeConfirm()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ IMPORT SCORES ═══ -->
+
+<div id="import-overlay">
+  <div id="import-box">
+    <div id="import-title">Import Scores</div>
+    <div id="import-msg">Paste the scores you copied with "Copy Scores" below.</div>
+    <textarea id="import-textarea" placeholder="Paste copied scores here..." spellcheck="false" autocomplete="off"></textarea>
+    <div id="import-status"></div>
+    <div id="import-btns">
+      <button id="import-confirm" onclick="confirmImportScores()">Import</button>
+      <button id="import-cancel" onclick="closeImportScores()">Cancel</button>
     </div>
   </div>
 </div>

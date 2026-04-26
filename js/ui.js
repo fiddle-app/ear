@@ -43,7 +43,7 @@ function openResetDefaults() { $('reset-overlay').classList.add('open'); }
 function closeResetDefaults() { $('reset-overlay').classList.remove('open'); }
 function confirmResetDefaults() {
 $('reset-overlay').classList.remove('open');
-settings = { lowestNote:22, highestNote:53, startCentsIdx:5, noteDurIdx:3, attack:1, decay:1, soundIdx:0, testsPerRound:3 };
+settings = { lowestNote:22, highestNote:53, startCentsIdx:5, noteDurIdx:3, attack:1, decay:1, soundIdx:2, testsPerRound:3 };
 saveSettings();
 centsIdx = settings.startCentsIdx;
 renderSettings();
@@ -554,6 +554,83 @@ try {
     setTimeout(() => { btn.textContent = 'Copy Scores'; }, 2000);
   });
 }
+}
+
+// ══════════════════════════════════════════════════════
+// IMPORT SCORES
+// ══════════════════════════════════════════════════════
+function openImportScores() {
+  const ta = $('import-textarea');
+  if (ta) ta.value = '';
+  const st = $('import-status');
+  if (st) { st.textContent = ''; st.className = ''; }
+  $('import-overlay').classList.add('open');
+  if (ta) setTimeout(() => ta.focus(), 50);
+}
+function closeImportScores() {
+  $('import-overlay').classList.remove('open');
+}
+
+// Parse scores from raw clipboard input and return { name -> bestCents } or null.
+// Works against three input shapes:
+//   (1) The original HTML produced by copyScores() — classes intact
+//   (2) Gmail-mangled HTML — classes stripped, visible structure preserved
+//   (3) Plain text rendering of either of the above
+// Strategy: if the input looks like HTML, extract text content via DOMParser
+// (innerText preserves table cell separators); then scan lines for the
+// `<note> <value>¢?` pattern. Anchoring at line start/end prevents prose
+// false-positives like "Average score: 7.0¢".
+function parseImportedScores(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+  let text = raw;
+  if (/<[a-z][^>]*>/i.test(raw)) {
+    try {
+      const doc = new DOMParser().parseFromString(raw, 'text/html');
+      const body = doc && doc.body;
+      if (body) text = body.innerText || body.textContent || raw;
+    } catch (e) { /* fall back to raw */ }
+  }
+  const rowRe = /^\s*([A-G])([#♯])?(\d)\s+(-?\d+(?:\.\d+)?)\s*¢?\s*$/;
+  const result = {};
+  const lines = text.split(/\r?\n/);
+  for (const line of lines) {
+    const m = rowRe.exec(line);
+    if (!m) continue;
+    const noteName = m[1] + (m[2] ? '#' : '') + m[3];
+    if (!ALL_NOTES.some(n => n.name === noteName)) continue;
+    const cents = parseFloat(m[4]);
+    if (!isFinite(cents) || cents < 0) continue;
+    result[noteName] = cents;
+  }
+  return Object.keys(result).length ? result : null;
+}
+
+function confirmImportScores() {
+  const ta  = $('import-textarea');
+  const st  = $('import-status');
+  const raw = ta ? ta.value : '';
+  const parsed = parseImportedScores(raw);
+  if (!parsed) {
+    if (st) {
+      st.textContent = 'Could not find any scores. Paste the full content copied from "Copy Scores".';
+      st.className = 'error';
+    }
+    return;
+  }
+  // Merge into stats. Preserve existing fields; overwrite bestCents only.
+  Object.keys(parsed).forEach(name => {
+    if (!stats[name]) stats[name] = {};
+    stats[name].bestCents = parsed[name];
+    if (stats[name].attempts == null) stats[name].attempts = 1;
+  });
+  saveStats();
+  renderStats();
+  const count = Object.keys(parsed).length;
+  if (st) {
+    st.textContent = 'Imported ' + count + ' score' + (count === 1 ? '' : 's') + '.';
+    st.className = 'success';
+  }
+  setTimeout(closeImportScores, 900);
 }
 
 (function() {

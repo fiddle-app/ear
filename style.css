@@ -498,6 +498,38 @@ border: 1.5px solid rgba(0,0,0,0.15); background: rgba(0,0,0,0.06); color: rgba(
 transition: background 0.15s;
 }
 #info-fake-history:active { background: rgba(0,0,0,0.12); }
+#info-import-scores {
+-webkit-appearance: none; font-family: var(--font); font-size: clamp(13px, 3.5vw, 15px);
+padding: 10px 22px; border-radius: 999px; cursor: pointer;
+border: 1.5px solid rgba(0,0,0,0.15); background: rgba(0,0,0,0.06); color: rgba(0,0,0,0.45);
+transition: background 0.15s;
+}
+#info-import-scores:active { background: rgba(0,0,0,0.12); }
+
+/* Import Scores overlay */
+#import-overlay {
+display: none; position: fixed; inset: 0; z-index: 500;
+background: rgba(0,0,0,0.72); align-items: center; justify-content: center;
+padding: 16px;
+}
+#import-overlay.open { display: flex; }
+#import-box { background: #2a2a2a; border-radius: 16px; padding: 24px 22px; max-width: 480px; width: 100%; font-family: var(--font); color: #fff; display: flex; flex-direction: column; }
+#import-title { font-size: clamp(17px, 5vw, 21px); font-weight: 600; margin-bottom: 8px; }
+#import-msg   { font-size: clamp(13px, 3.6vw, 15px); font-weight: 300; color: rgba(255,255,255,0.70); margin-bottom: 14px; line-height: 1.45; }
+#import-textarea {
+width: 100%; min-height: 140px; max-height: 40vh; resize: vertical;
+background: #1a1a1a; color: #e8ddd0; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px;
+padding: 10px; font-family: 'Inconsolata', monospace; font-size: 12px; line-height: 1.4;
+box-sizing: border-box; -webkit-appearance: none; outline: none;
+}
+#import-textarea:focus { border-color: rgba(232,122,80,0.6); }
+#import-status { font-size: clamp(12px, 3.4vw, 14px); color: rgba(255,255,255,0.65); min-height: 1.2em; margin: 10px 0 4px; }
+#import-status.error   { color: #ff8866; }
+#import-status.success { color: #8fd57a; }
+#import-btns  { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+#import-btns button { -webkit-appearance: none; font-family: var(--font); cursor: pointer; border-radius: 999px; font-size: clamp(14px, 4vw, 16px); padding: 12px; border: none; transition: opacity 0.15s; }
+#import-confirm { background: #b83c08; color: #fff; }
+#import-cancel  { background: rgba(255,255,255,0.14); color: #fff; }
 
 /* Welcome overlay */
 #welcome-overlay {
