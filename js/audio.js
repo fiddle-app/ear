@@ -104,54 +104,10 @@ function beepCorrect() {
 const ctx=audioCtx,t=ctx.currentTime+0.02;
 [523.25,659.25].forEach((f,i)=>{ const o=ctx.createOscillator(),g=ctx.createGain(); o.type='sine'; o.frequency.setValueAtTime(f,t+i*0.12); g.gain.setValueAtTime(0.16,t+i*0.12); g.gain.exponentialRampToValueAtTime(0.001,t+i*0.12+0.22); o.connect(g); g.connect(ctx.destination); o.start(t+i*0.12); o.stop(t+i*0.12+0.25); });
 }
-function chimeSuccess() {
-// Boxing ring bell: A4 (440Hz), single strike, 2.5s decay
-// Uses inharmonic partials to simulate metal bell resonance
-const freq  = 440;   // A4 (changed from A5 880Hz)
-const dur   = 2.5;
-const gain  = 0.1;
-const delay = 0;
-const partials = [
-  { ratio: 1.000, gainFrac: 1.00, durFrac: 1.0 },
-  { ratio: 2.756, gainFrac: 0.50, durFrac: 0.7 },
-  { ratio: 5.404, gainFrac: 0.25, durFrac: 0.5 },
-  { ratio: 8.933, gainFrac: 0.12, durFrac: 0.3 },
-];
-partials.forEach(({ ratio, gainFrac, durFrac }) => {
-  const t = audioCtx.currentTime + delay;
-  const g = audioCtx.createGain();
-  const o = audioCtx.createOscillator();
-  o.type = 'sine';
-  o.frequency.value = freq * ratio;
-  g.gain.setValueAtTime(0, t);
-  g.gain.linearRampToValueAtTime(gain * gainFrac, t + 0.003);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + dur * durFrac);
-  o.connect(g);
-  g.connect(audioCtx.destination);
-  o.start(t);
-  o.stop(t + dur * durFrac + 0.05);
-});
-}
-
-/*
-// Original meditation chime (528Hz fundamental, 3s decay) — kept for reference
-function chimeSuccess_orig() {
-const ctx = audioCtx, t = ctx.currentTime + 0.05;
-const fundamental = 528;
-const harmonics = [1, 2, 3, 4.2];
-const gains     = [0.18, 0.10, 0.05, 0.02];
-harmonics.forEach((h, i) => {
-const o = ctx.createOscillator(), g = ctx.createGain();
-o.type = 'sine';
-o.frequency.setValueAtTime(fundamental * h, t);
-g.gain.setValueAtTime(0, t);
-g.gain.linearRampToValueAtTime(gains[i], t + 0.008);
-g.gain.exponentialRampToValueAtTime(0.0001, t + 3.0);
-o.connect(g); g.connect(ctx.destination);
-o.start(t); o.stop(t + 3.1);
-});
-}
-*/
+// chimeSuccess() lives in js/chime-success.js (shared from _shared/js/).
+// Called via setTimeout(chimeSuccess, …) from game.js — no local wrapper needed:
+// the shared function defaults dest to ctx.destination, matching ear-tuner's
+// use (no master gain node).
 
 function beepWrong() {
 const ctx=audioCtx,t=ctx.currentTime+0.02;

@@ -96,7 +96,27 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.getRegistrations()
       .then(regs => regs.forEach(r => r.unregister()));
   } else {
-    // Relative path so it resolves at fiddle-app.github.io/ear/sw.js.
-    navigator.serviceWorker.register('sw.js');
+    // Auto-update on every launch — iOS home-screen PWAs honour the browser's
+    // built-in 24h update check very loosely, leaving users many days out of
+    // date. Force a check now, push any new SW to activate, and reload once
+    // when it takes over. See research/pwa-reload-button-diagnosis.md §8.
+    let reloadingForUpdate = false;
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      reg.update().catch(() => {});
+      reg.addEventListener('updatefound', () => {
+        const newSW = reg.installing;
+        if (!newSW) return;
+        newSW.addEventListener('statechange', () => {
+          if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+            newSW.postMessage({ type: 'SKIP_WAITING' });
+          }
+        });
+      });
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (reloadingForUpdate) return;
+        reloadingForUpdate = true;
+        window.location.reload();
+      });
+    });
   }
 }

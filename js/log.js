@@ -53,8 +53,23 @@ try { localStorage.removeItem(LOG_KEY); } catch(e){}
 updateLogUI();
 logEvent('Log cleared');
 }
-function reloadFromServer() {
-window.location.replace(window.location.pathname + '?nocache=' + Date.now());
+async function reloadFromServer() {
+try {
+  if ('serviceWorker' in navigator) {
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (reg) {
+      await reg.update();
+      if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+    }
+  }
+  if (window.caches) {
+    const keys = await caches.keys();
+    await Promise.all(
+      keys.filter(k => k.startsWith('ear-tuner-static-')).map(k => caches.delete(k))
+    );
+  }
+} catch (e) { /* ignore — reload anyway */ }
+window.location.replace(window.location.pathname);
 }
 function updateLogUI() {
 const chk = $('s-logging-chk');

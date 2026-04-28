@@ -42,7 +42,7 @@ for (let i = 0; i < settings.testsPerRound; i++) {
   const slot = document.createElement('div');
   slot.className = 'prog-slot';
   slot.id = 'prog' + i;
-  slot.innerHTML = `<svg width="28" height="28" viewBox="0 0 28 28" fill="none"> <circle cx="14" cy="14" r="12" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.20)" stroke-width="1.5"/> </svg>`;
+  slot.innerHTML = `<div class="prog-circle prog-empty"></div>`;
   row.appendChild(slot);
 }
 }
@@ -53,9 +53,9 @@ if (i < 0 || i >= settings.testsPerRound) return;
 const slot = $('prog' + i);
 if (!slot) return;
 if (roundResults[i]==='correct') {
-  slot.innerHTML=`<svg class="prog-check" width="28" height="28" viewBox="0 0 28 28" fill="none"> <circle cx="14" cy="14" r="12" fill="rgba(60,200,80,0.25)" stroke="rgba(80,220,100,0.70)" stroke-width="1.5"/> <path d="M8 14 L12 18 L20 10" stroke="#6fe882" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/> </svg>`;
+  slot.innerHTML=`<div class="prog-circle prog-correct"><svg width="20" height="20" viewBox="0 0 28 28" fill="none"><use href="#icon-glyph-check"/></svg></div>`;
 } else {
-  slot.innerHTML=`<svg class="prog-cross" width="28" height="28" viewBox="0 0 28 28" fill="none"> <circle cx="14" cy="14" r="12" fill="rgba(210,50,40,0.25)" stroke="rgba(230,80,70,0.70)" stroke-width="1.5"/> <path d="M9 9 L19 19M19 9 L9 19" stroke="#f07070" stroke-width="2.5" stroke-linecap="round"/> </svg>`;
+  slot.innerHTML=`<div class="prog-circle prog-wrong"><svg width="20" height="20" viewBox="0 0 28 28" fill="none"><use href="#icon-glyph-x"/></svg></div>`;
 }
 }
 

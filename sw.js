@@ -1,7 +1,7 @@
 // Ear Tuner — Service Worker
 // Pre-caches the app shell; runtime-caches sound samples.
 
-const CACHE_VER    = '2026-04-26 09:07';  // stamped by deploy.sh — do not edit manually
+const CACHE_VER    = '2026-04-28 19:28';  // stamped by deploy.sh — do not edit manually
 const STATIC_CACHE = `ear-tuner-static-${CACHE_VER}`;
 const FONT_CACHE   = 'ear-tuner-fonts';
 const SOUND_CACHE  = 'ear-tuner-sounds';
@@ -36,6 +36,12 @@ self.addEventListener('install', event => {
       .then(cache => cache.addAll(PRECACHE))
       .then(() => self.skipWaiting())
   );
+});
+
+// Allow the page to push a waiting SW into activation immediately
+// (covers the case where a previous install is sitting in 'waiting').
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 // ── Activate: delete old caches ───────────────────────────────────────────────

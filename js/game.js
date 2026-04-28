@@ -246,7 +246,7 @@ if (!correct) {
 if (roundResults.length===settings.testsPerRound && roundResults.every(x=>x==='correct')) {
   logEvent(`roundSuccess | note=${currentNote.name} | cents=${fmtC(cents)} | retest=${retestNote||'none'}`);
   stopAllSounds();
-  setTimeout(chimeSuccess, 150);
+  setTimeout(() => chimeSuccess(audioCtx), 150);
   setTimeout(smileProgressRow, 250);
   const key = currentNote.name;
   if (!stats[key]) stats[key]={};
