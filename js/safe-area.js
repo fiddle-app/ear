@@ -1,9 +1,3 @@
-/* ============================================================
-   REDUNDANT LOCAL COPY — DO NOT EDIT HERE
-   Canonical source: fiddle/_shared/js/safe-area.js
-   Run _shared/sync-shared.sh to push updates to all app copies.
-   ============================================================ */
-
 'use strict';
 // =================================================
 // SHARED SAFE-AREA / BACKGROUND COLOR SYNC
