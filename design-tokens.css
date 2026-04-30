@@ -28,4 +28,12 @@
   /* Fonts */
   --font:         'Inconsolata', monospace;  /* primary — all UI text */
   --font-numeric: 'Nunito', sans-serif;      /* numeric displays (timer, scores) */
+
+  /* Info-page typography — long-form copy on welcome/info/about screens.
+     Swap --font-info to retune the reading experience without disturbing
+     the chiseled-mono UI feel. Sizes are clamps so they remain responsive. */
+  --font-info:            'Nunito', sans-serif;
+  --font-info-heading:    clamp(20px, 6vw, 26px);   /* app-name banners */
+  --font-info-subheading: clamp(11px, 3vw, 13px);   /* taglines, .info-sec section labels */
+  --font-info-body:       clamp(14px, 3.5vw, 16px); /* paragraphs, copy labels */
 }

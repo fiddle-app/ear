@@ -516,6 +516,10 @@ const rows = scored.map(n => {
   </tr>`;
 }).join('');
 
+// Resolve --font-info live so the copied email mirrors the in-app token.
+// Fall back to a sensible Nunito stack if the var isn't set (older renders / bad CSS state).
+const infoFont = (getComputedStyle(document.documentElement).getPropertyValue('--font-info').trim() || "'Nunito', sans-serif");
+
 const html = `<style>
   @media (prefers-color-scheme: dark) {
     .et-wrap  { background-color:#1c1c1e !important; color:#e8ddd0 !important; }
@@ -530,7 +534,7 @@ const html = `<style>
     .et-th { color:rgba(255,255,255,0.38) !important; border-bottom-color:rgba(255,255,255,0.15) !important; }
   }
 </style>
-<div class="et-wrap" style="font-family:'Inconsolata',monospace,sans-serif;color:#2a2018;font-size:15px;">
+<div class="et-wrap" style="font-family:${infoFont};color:#2a2018;font-size:15px;">
   <p class="et-intro" style="color:#2a2018;font-size:14px;line-height:1.65;margin:0 0 16px;">${introHtml}</p>
   <div class="et-avg" style="background:rgba(184,60,8,0.12);border-left:3px solid #b83c08;padding:8px 14px;border-radius:0 6px 6px 0;margin-bottom:18px;font-size:14px;color:#8f2d06;font-weight:600;display:inline-block;">Average score: ${avg.toFixed(1)}\u00a2</div>
   <table style="border-collapse:collapse;width:100%;max-width:440px;">
