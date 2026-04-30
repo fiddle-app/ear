@@ -153,6 +153,18 @@
       <div class="s-sec">Note Sound</div>
       <div id="sound-grid"></div>
 
+      <div class="s-row" id="s-volume-row">
+        <div>
+          <div class="s-label">Volume</div>
+          <div class="s-sub">Boost playback on quiet devices</div>
+        </div>
+        <div class="s-volume-control">
+          <input type="range" id="s-volume-slider" min="0" max="200" step="5" value="100"
+                 oninput="adjustVolume(this.value)" aria-label="Playback volume">
+          <div class="s-val" id="s-volume-val">100%</div>
+        </div>
+      </div>
+
       <div class="s-sec">Note Range</div>
       <div class="s-row">
         <div><div class="s-label">Lowest Note</div><div class="s-sub">The lowest note that will be tested</div></div>

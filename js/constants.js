@@ -30,7 +30,7 @@ const VOICE_GAIN = {
 // ══════════════════════════════════════════════════════
 // CONSTANTS
 // ══════════════════════════════════════════════════════
-const BUILD_DATE  = '2026-04-28 21:18';   // stamped by deploy.sh — do not edit manually
+const BUILD_DATE  = '2026-04-30 10:52';   // stamped by deploy.sh — do not edit manually
 const CENTS_SEQ   = [100, 50, 25, 20, 15, 10, 7, 6, 5, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, 1.5, 1.0, 0.5];
 const MAX_CENTS   = CENTS_SEQ[0]; // 100 — largest/easiest difference
 const fmtC        = c => Number.isInteger(c) ? c+'¢' : c.toFixed(1)+'¢'; // format cents value
@@ -61,6 +61,7 @@ const dn        = name => name.replace('#','♯');
 let settings = {
   lowestNote:22, highestNote:53,
   startCentsIdx:5, noteDurIdx:3, attack:1, decay:1, soundIdx:2, testsPerRound:3,
+  volume: 1.0,
 };
 let stats = {}; // noteName → { bestCents, attempts }
 

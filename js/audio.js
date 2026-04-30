@@ -1,4 +1,15 @@
 'use strict';
+// Audio output destination — masterGain (when audioCtx exists) lets the
+// Volume setting scale every tone, beep, and chime in one place. Falls back
+// to ctx.destination if masterGain is not yet built.
+function audioOut() {
+  if (typeof masterGain !== 'undefined' && masterGain) {
+    masterGain.gain.value = settings.volume;
+    return masterGain;
+  }
+  return audioCtx.destination;
+}
+
 // SOUNDFONT LOADING via soundfont-player
 // sfInstruments: sfName → Soundfont instrument object
 // ══════════════════════════════════════════════════════
@@ -11,6 +22,7 @@ if (sfLoadingP[sfName])    return sfLoadingP[sfName];
 sfLoadingP[sfName] = Soundfont.instrument(audioCtx, sfName, {
   from: 'sounds/',
   gain: 1.0,
+  destination: audioOut(),
 }).then(inst => {
   sfInstruments[sfName] = inst;
   return inst;
@@ -22,9 +34,12 @@ return sfLoadingP[sfName];
 // PLAY FUNCTIONS — all return a handle with stopAt()
 // ══════════════════════════════════════════════════════
 function playSfNote(inst, midiF, startTime, duration, gain) {
+// Refresh instrument destination to current masterGain — handles instruments
+// loaded before audioCtx existed AND syncs masterGain.gain.value to settings.volume.
+const dest = audioOut();
+if (inst && 'destination' in inst) inst.destination = dest;
 // soundfont-player: inst.play(note, time, options) — accepts fractional midi for detuning
-// Returns an AudioNode with .stop(when)
-const node = inst.play(midiF, startTime, { duration: duration, gain: gain });
+const node = inst.play(midiF, startTime, { duration: duration, gain: gain, destination: dest });
 return {
   stopAt(t) { try { node.stop(t); } catch(e){} }
 };
@@ -36,7 +51,7 @@ const atk    = ATK_PRESETS[settings.attack][1];
 const rel    = DEC_PRESETS[settings.decay][1];
 const peak   = 0.137, sus=0.65, dec=0.10;
 
-const mg = ctx.createGain(); mg.connect(ctx.destination);
+const mg = ctx.createGain(); mg.connect(audioOut());
 mg.gain.setValueAtTime(0,startTime);
 mg.gain.linearRampToValueAtTime(peak, startTime+atk);
 mg.gain.linearRampToValueAtTime(peak*sus, startTime+atk+dec);
@@ -80,7 +95,7 @@ const osc=ctx.createOscillator(), g=ctx.createGain();
 osc.type='sine'; osc.frequency.setValueAtTime(freqHz,startTime);
 g.gain.setValueAtTime(0,startTime); g.gain.linearRampToValueAtTime(0.112,startTime+atk);
 g.gain.setValueAtTime(0.112,startTime+duration-rel); g.gain.linearRampToValueAtTime(0,startTime+duration);
-osc.connect(g); g.connect(ctx.destination);
+osc.connect(g); g.connect(audioOut());
 osc.start(startTime); osc.stop(startTime+duration+0.1);
 return { gain:g, stopAt(t){ g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(g.gain.value,t); g.gain.linearRampToValueAtTime(0,t+0.04); try{osc.stop(t+0.05);}catch(e){} } };
 }
@@ -101,17 +116,16 @@ return playSynthViolin(hz, startTime, duration); // fallback while loading
 // FEEDBACK BEEPS
 // ══════════════════════════════════════════════════════
 function beepCorrect() {
-const ctx=audioCtx,t=ctx.currentTime+0.02;
-[523.25,659.25].forEach((f,i)=>{ const o=ctx.createOscillator(),g=ctx.createGain(); o.type='sine'; o.frequency.setValueAtTime(f,t+i*0.12); g.gain.setValueAtTime(0.16,t+i*0.12); g.gain.exponentialRampToValueAtTime(0.001,t+i*0.12+0.22); o.connect(g); g.connect(ctx.destination); o.start(t+i*0.12); o.stop(t+i*0.12+0.25); });
+const ctx=audioCtx,t=ctx.currentTime+0.02,dest=audioOut();
+[523.25,659.25].forEach((f,i)=>{ const o=ctx.createOscillator(),g=ctx.createGain(); o.type='sine'; o.frequency.setValueAtTime(f,t+i*0.12); g.gain.setValueAtTime(0.16,t+i*0.12); g.gain.exponentialRampToValueAtTime(0.001,t+i*0.12+0.22); o.connect(g); g.connect(dest); o.start(t+i*0.12); o.stop(t+i*0.12+0.25); });
 }
 // chimeSuccess() lives in js/chime-success.js (shared from _shared/js/).
-// Called via setTimeout(chimeSuccess, …) from game.js — no local wrapper needed:
-// the shared function defaults dest to ctx.destination, matching ear-tuner's
-// use (no master gain node).
+// Called from game.js — pass audioOut() so the chime is gain-scaled by the
+// Volume setting, same as every other tone/beep.
 
 function beepWrong() {
-const ctx=audioCtx,t=ctx.currentTime+0.02;
-[220,196].forEach((f,i)=>{ const o=ctx.createOscillator(),g=ctx.createGain(); o.type='triangle'; o.frequency.setValueAtTime(f,t+i*0.15); g.gain.setValueAtTime(0.16,t+i*0.15); g.gain.exponentialRampToValueAtTime(0.001,t+i*0.15+0.42); o.connect(g); g.connect(ctx.destination); o.start(t+i*0.15); o.stop(t+i*0.15+0.48); });
+const ctx=audioCtx,t=ctx.currentTime+0.02,dest=audioOut();
+[220,196].forEach((f,i)=>{ const o=ctx.createOscillator(),g=ctx.createGain(); o.type='triangle'; o.frequency.setValueAtTime(f,t+i*0.15); g.gain.setValueAtTime(0.16,t+i*0.15); g.gain.exponentialRampToValueAtTime(0.001,t+i*0.15+0.42); o.connect(g); g.connect(dest); o.start(t+i*0.15); o.stop(t+i*0.15+0.48); });
 }
 
 

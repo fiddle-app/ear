@@ -43,7 +43,7 @@ function openResetDefaults() { $('reset-overlay').classList.add('open'); }
 function closeResetDefaults() { $('reset-overlay').classList.remove('open'); }
 function confirmResetDefaults() {
 $('reset-overlay').classList.remove('open');
-settings = { lowestNote:22, highestNote:53, startCentsIdx:5, noteDurIdx:3, attack:1, decay:1, soundIdx:2, testsPerRound:3 };
+settings = { lowestNote:22, highestNote:53, startCentsIdx:5, noteDurIdx:3, attack:1, decay:1, soundIdx:2, testsPerRound:3, volume:1.0 };
 saveSettings();
 centsIdx = settings.startCentsIdx;
 renderSettings();
@@ -78,8 +78,22 @@ $('s-note-dur').textContent    = DUR_STEPS[settings.noteDurIdx].toFixed(1)+'s';
 $('s-attack').textContent      = ATK_PRESETS[settings.attack][0];
 $('s-decay').textContent       = DEC_PRESETS[settings.decay][0];
 $('s-build-date').textContent  = 'build ' + BUILD_DATE;
+const volPct = Math.round(settings.volume * 100);
+$('s-volume-slider').value     = volPct;
+$('s-volume-val').textContent  = volPct + '%';
 renderSoundGrid();
 updateLogUI();
+}
+
+function adjustVolume(percentStr) {
+const pct = Math.max(0, Math.min(200, parseInt(percentStr, 10) || 0));
+settings.volume = pct / 100;
+saveSettings();
+$('s-volume-val').textContent = pct + '%';
+if (typeof masterGain !== 'undefined' && masterGain) {
+  masterGain.gain.value = settings.volume;
+}
+schedulePreview();
 }
 
 function renderSoundGrid() {
