@@ -249,6 +249,11 @@ if (wbd) wbd.textContent = 'build ' + (typeof BUILD_DATE === 'string' ? BUILD_DA
 $('welcome-overlay').classList.add('open');
 $('app').style.visibility = 'hidden';
 $('swipe-hint').style.visibility = 'hidden';
+// Hide info/settings affordances — they're faintly visible through the
+// parchment overlay edges and shouldn't be accessible until the user
+// clears the launch gate.
+$('info-btn').style.visibility = 'hidden';
+$('settings-btn').style.visibility = 'hidden';
 }
 
 function closeWelcome() {
@@ -262,6 +267,8 @@ if (settings.voiceCommands) {
 }
 $('app').style.visibility = '';
 $('swipe-hint').style.visibility = '';
+$('info-btn').style.visibility = '';
+$('settings-btn').style.visibility = '';
 setBg('#4d1903');
 }
 
@@ -290,12 +297,16 @@ function openHello() {
   $('hello-overlay').classList.add('open');
   $('app').style.visibility = 'hidden';
   $('swipe-hint').style.visibility = 'hidden';
+  $('info-btn').style.visibility = 'hidden';
+  $('settings-btn').style.visibility = 'hidden';
 }
 
 function closeHelloAndGo() {
   $('hello-overlay').classList.remove('open');
   $('app').style.visibility = '';
   $('swipe-hint').style.visibility = '';
+  $('info-btn').style.visibility = '';
+  $('settings-btn').style.visibility = '';
   setBg('#4d1903');
   showStartScreen();
 }
