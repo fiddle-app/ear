@@ -1,7 +1,7 @@
 // Ear Tuner — Service Worker
 // Pre-caches the app shell; runtime-caches sound samples.
 
-const CACHE_VER    = '2026-04-30 18:20';  // stamped by deploy.sh — do not edit manually
+const CACHE_VER    = '2026-05-13 08:04';  // stamped by deploy.sh — do not edit manually
 const STATIC_CACHE = `ear-tuner-static-${CACHE_VER}`;
 const FONT_CACHE   = 'ear-tuner-fonts';
 const SOUND_CACHE  = 'ear-tuner-sounds';
@@ -13,6 +13,9 @@ const PRECACHE = [
   './',
   'index.html',
   'style.css',
+  'design-tokens.css',
+  'design-tokens-app.css',
+  'glyph-disc.css',
   'soundfont-player.min.js',
   'fonts/fonts.css',
   'fonts/inconsolata-latin.woff2',
@@ -21,20 +24,50 @@ const PRECACHE = [
   'js/persistence.js',
   'js/log.js',
   'js/audio-ctx.js',
+  'js/mic.js',
+  'js/wakelock.js',
+  'js/chime-success.js',
   'js/audio.js',
   'js/game.js',
+  'js/safe-area.js',
   'js/render.js',
+  'js/context-dispatch.js',
   'js/ui.js',
+  // vosk-browser.js intentionally omitted — voice.js lazy-loads it on first
+  // opt-in (Hello → Yes). The fetch handler below will populate STATIC_CACHE
+  // on first use, so subsequent launches still serve it offline.
+  'js/voice-commands.js',
+  'js/voice-commands-worklet.js',
+  'js/voice.js',
   'js/boot.js',
   'resources/app-icon-180.png',
 ];
 
-// ── Install: pre-cache app shell ──────────────────────────────────────────────
+// ── Install: pre-cache app shell, tolerantly ─────────────────────────────────
+// A single 404 used to doom the entire install (cache.addAll is atomic — one
+// rejection rolls back all), leaving the user permanently stuck on the prior
+// SW. Per-file try/catch localises the failure: missing files get logged and
+// the install completes; the runtime fetch handler will network-fetch + cache
+// them on first request.
+//
+// Catastrophic-failure guard: if EVERY entry failed (CDN outage during the
+// install window, full server-side disaster), throw — that rejects the
+// install, which preserves the prior working SW rather than replacing it
+// with a corpse cache.
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(STATIC_CACHE)
-      .then(cache => cache.addAll(PRECACHE))
-      .then(() => self.skipWaiting())
+    caches.open(STATIC_CACHE).then(async (cache) => {
+      const failed = [];
+      for (const url of PRECACHE) {
+        try { await cache.add(url); }
+        catch (e) { failed.push(url + ' (' + (e && e.message) + ')'); }
+      }
+      if (failed.length) console.warn('[sw] install: failed to precache:', failed);
+      if (failed.length === PRECACHE.length) {
+        throw new Error('SW install: every PRECACHE entry failed; aborting to keep prior SW in charge');
+      }
+      await self.skipWaiting();
+    })
   );
 });
 

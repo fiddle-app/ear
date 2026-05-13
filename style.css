@@ -595,9 +595,45 @@ body:has(#welcome-overlay.open) #info-btn,
 body:has(#welcome-overlay.open) #settings-btn { color: rgba(0,0,0,0.35); }
 body:has(#welcome-overlay.open) #info-btn:active,
 body:has(#welcome-overlay.open) #settings-btn:active { color: rgba(0,0,0,0.75); }
-#welcome-content {
+#welcome-content,
+.welcome-content-shape {
 display: flex; flex-direction: column; gap: 18px; max-width: 600px; width: 100%;
 flex-grow: 1;
+}
+/* Hello / Resume overlays share the welcome overlay's padding and z layer. */
+#hello-overlay, #resume-overlay {
+padding: calc(var(--safe-top) + 8px) 24px calc(var(--safe-bot) + 68px);
+align-items: center;
+z-index: 190;
+}
+/* Hello / Resume buttons reuse the Get Started shape. */
+#hello-yes-btn, #hello-no-btn, #resume-btn {
+-webkit-appearance: none; font-family: var(--font);
+font-size: clamp(15px,4.5vw,19px); font-weight: 600; letter-spacing: 0.08em;
+background: var(--color-orange); color: #fff; border: none; border-radius: 999px;
+padding: 14px 28px; cursor: pointer; align-self: center;
+transition: background 0.15s;
+}
+#hello-no-btn { background: rgba(0,0,0,0.18); color: rgba(0,0,0,0.75); }
+#hello-yes-btn:active, #resume-btn:active { background: var(--color-orange-dark); }
+#hello-no-btn:active { background: rgba(0,0,0,0.30); }
+/* Live VR transcript echo + loader. Anchored bottom-center, low z. */
+#vc-transcript {
+position: fixed; left: 50%; bottom: calc(var(--safe-bot) + 8px);
+transform: translateX(-50%);
+font-family: var(--font); font-size: clamp(11px, 3vw, 14px);
+color: rgba(255,255,255,0.7);
+opacity: 0; transition: opacity 0.2s; pointer-events: none;
+z-index: 50;
+}
+#vc-transcript.visible { opacity: 1; }
+#vc-loader {
+position: fixed; left: 50%; top: calc(var(--safe-top) + 12px);
+transform: translateX(-50%);
+font-family: var(--font); font-size: clamp(11px, 3vw, 14px);
+color: rgba(255,255,255,0.85);
+background: rgba(0,0,0,0.45); border-radius: 12px;
+padding: 8px 14px; z-index: 200;
 }
 .welcome-push { flex: 1; min-height: 0; }
 #welcome-get-started {

@@ -8,6 +8,14 @@ setTimeout(() => {
 }, 100);
 });
 
+// Wake-lock activity hook — any tap anywhere resets the 30-min idle timer
+// and, if we lost the sentinel after a background, re-requests it from
+// within the current gesture frame. Bails fast if intent isn't set, so
+// the cost outside an active session is one boolean check.
+document.addEventListener('pointerdown',
+  () => { if (typeof wlOnActivity === 'function') wlOnActivity('pointerdown'); },
+  { passive: true });
+
 // SWIPE + SHAKE
 // ══════════════════════════════════════════════════════
 let touchStartY=0, touchStartX=0;
@@ -43,7 +51,12 @@ function openResetDefaults() { $('reset-overlay').classList.add('open'); }
 function closeResetDefaults() { $('reset-overlay').classList.remove('open'); }
 function confirmResetDefaults() {
 $('reset-overlay').classList.remove('open');
-settings = { lowestNote:22, highestNote:53, startCentsIdx:5, noteDurIdx:3, attack:1, decay:1, soundIdx:2, testsPerRound:3, volume:1.0 };
+settings = {
+  lowestNote:22, highestNote:53,
+  startCentsIdx:5, noteDurIdx:3, attack:1, decay:1, soundIdx:2, testsPerRound:3,
+  volume:1.0,
+  voiceCommands: false, limitVrVocab: true, vcKeepLastWord: false,
+};
 saveSettings();
 centsIdx = settings.startCentsIdx;
 renderSettings();
@@ -62,6 +75,10 @@ else if (key==='noteDurIdx')    settings.noteDurIdx    = Math.max(0, Math.min(DU
 else if (key==='attack') { settings.attack=Math.max(0,Math.min(ATK_PRESETS.length-1,settings.attack+dir)); schedulePreview(); }
 else if (key==='decay')  { settings.decay =Math.max(0,Math.min(DEC_PRESETS.length-1,settings.decay+dir));  schedulePreview(); }
 saveSettings(); renderSettings();
+// Note-range changes invalidate the VR octave vocabulary — cheap rebuild.
+if ((key === 'lowestNote' || key === 'highestNote') && typeof vcOnSettingChange === 'function') {
+  vcOnSettingChange(key);
+}
 }
 
 function schedulePreview() {
@@ -82,7 +99,31 @@ const volPct = Math.round(settings.volume * 100);
 $('s-volume-slider').value     = volPct;
 $('s-volume-val').textContent  = volPct + '%';
 renderSoundGrid();
+renderVoiceSettings();
 updateLogUI();
+}
+
+// Voice Recognition settings row sync.
+function renderVoiceSettings() {
+const chk = $('s-voice-chk');
+if (chk) chk.checked = !!settings.voiceCommands;
+const row = $('s-vc-status-row');
+if (row) row.style.display = settings.voiceCommands ? '' : 'none';
+}
+
+// Toggle Voice Recognition on/off (Settings → Voice Recognition).
+// Turning it ON flips the persisted setting; Hello will fire on the
+// next cold launch to gather a daily yes/no. Turning it OFF also stops
+// any running recognizer and disables the Resume modal for this session.
+function onVoiceToggle(enabled) {
+settings.voiceCommands = !!enabled;
+saveSettings();
+renderVoiceSettings();
+if (!enabled) {
+  sessionUseVoice = false;
+  if (typeof vcStop === 'function') vcStop();
+}
+if (typeof vcOnSettingChange === 'function') vcOnSettingChange('voiceCommands');
 }
 
 function adjustVolume(percentStr) {
@@ -170,6 +211,11 @@ function closeWelcome() {
 welcomeIsOpen = false;
 try { localStorage.setItem('vio4-seen-welcome', '1'); } catch(e) {}
 $('welcome-overlay').classList.remove('open');
+// Route through Hello when VR is opted in; otherwise straight to Start.
+if (settings.voiceCommands) {
+  openHello();
+  return;
+}
 $('app').style.visibility = '';
 $('swipe-hint').style.visibility = '';
 setBg('#4d1903');
@@ -182,6 +228,141 @@ if (!btn) return;
 btn.textContent = 'Done!';
 btn.disabled = true;
 setTimeout(() => { btn.textContent = 'Reset'; btn.disabled = false; }, 1500);
+}
+
+// ══════════════════════════════════════════════════════
+// HELLO — daily voice-recognition opt-in
+// ══════════════════════════════════════════════════════
+// Shown on every cold launch when `settings.voiceCommands` is true.
+// The user picks Yes/No for the session. Yes triggers the iOS gesture
+// frame for both `ensureAudio()` and `acquireMic()` — those must be
+// kicked off synchronously inside the click handler (no `await`
+// before either call) or iOS Safari closes the permission window on
+// the first async boundary.
+function openHello() {
+  setBg('#f5efe6');
+  $('hello-overlay').classList.add('open');
+  $('app').style.visibility = 'hidden';
+  $('swipe-hint').style.visibility = 'hidden';
+}
+
+function closeHelloAndGo() {
+  $('hello-overlay').classList.remove('open');
+  $('app').style.visibility = '';
+  $('swipe-hint').style.visibility = '';
+  setBg('#4d1903');
+  showStartScreen();
+}
+
+// Hello → "Yes, use voice today". Synchronously kicks audio + mic.
+function onHelloYes() {
+  sessionUseVoice = true;
+  const audioP = (typeof ensureAudio === 'function') ? ensureAudio() : Promise.resolve();
+  const micP   = (typeof acquireMic === 'function') ? acquireMic() : Promise.resolve(false);
+  Promise.all([audioP, micP]).then(([_, micOk]) => {
+    if (!micOk) {
+      console.warn('[hello] mic acquisition failed — proceeding without VR for this session');
+      sessionUseVoice = false;
+    } else if (typeof vcKickOffLoad === 'function') {
+      // Lazy-load the Vosk bundle now that the user has opted in.
+      try { vcKickOffLoad(); } catch (e) { console.warn('[hello] vcKickOffLoad threw:', e); }
+    }
+    if (typeof wlAcquire === 'function') wlAcquire('hello-yes');
+    closeHelloAndGo();
+  }).catch(e => {
+    console.warn('[hello] yes-path error:', e);
+    closeHelloAndGo();
+  });
+}
+
+// Hello → "No, not today". Only unlocks the audio context.
+function onHelloNo() {
+  sessionUseVoice = false;
+  const audioP = (typeof ensureAudio === 'function') ? ensureAudio() : Promise.resolve();
+  audioP.then(() => {
+    if (typeof wlAcquire === 'function') wlAcquire('hello-no');
+    closeHelloAndGo();
+  }).catch(e => {
+    console.warn('[hello] no-path error:', e);
+    closeHelloAndGo();
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// VISIBILITY RECOVERY + RESUME MODAL
+// ══════════════════════════════════════════════════════
+// Probe-and-rebuild model (2026-05-09): only getUserMedia truly needs
+// a fresh user-gesture frame. AudioContext, audioCtx.resume(), Vosk
+// reload, and AudioWorkletNode construction all work outside a gesture
+// once the session has had at least one earlier gesture. So the Resume
+// modal is reserved for the case where iOS invalidated the mic stream
+// AND we still want VR — when sessionUseVoice is false, we silently
+// rebuild audio and skip the modal.
+let _foregroundedInFlight = false;
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') _onMaybeForegrounded();
+});
+window.addEventListener('pageshow', () => _onMaybeForegrounded());
+window.addEventListener('focus',    () => _onMaybeForegrounded());
+
+function _onMaybeForegrounded() {
+  if (_foregroundedInFlight) return;
+  if (document.visibilityState !== 'visible') return;
+  _foregroundedInFlight = true;
+  (async () => {
+    try {
+      // Silent audio rebuild if needed. ensureAudio is idempotent and
+      // will resume / re-create the AudioContext as required.
+      if (typeof ensureAudio === 'function') {
+        try { await ensureAudio(); } catch (e) { console.warn('[fg] ensureAudio failed:', e); }
+      }
+      const wantsMic = sessionUseVoice;
+      if (wantsMic) {
+        const live = (typeof micStreamIsLive === 'function') ? micStreamIsLive() : false;
+        if (!live) {
+          // iOS invalidated the stream. Need a fresh gesture — show Resume.
+          showResume();
+          return;
+        }
+      }
+      // Either we don't need a mic, or the stream is still alive. Reset
+      // the wake-lock idle timer; if intent is still set, try to reacquire
+      // the sentinel (best-effort outside a real gesture).
+      if (typeof wlOnActivity === 'function') wlOnActivity('visibility-regain');
+    } finally {
+      _foregroundedInFlight = false;
+    }
+  })();
+}
+
+function showResume() {
+  const ov = $('resume-overlay');
+  if (!ov) return;
+  ov.classList.add('open');
+  $('app').style.visibility = 'hidden';
+}
+
+// Resume tap — fresh user gesture frame. Kicks audio + mic synchronously.
+function closeResume() {
+  const audioP = (typeof ensureAudio === 'function') ? ensureAudio() : Promise.resolve();
+  const micP   = (typeof acquireMic === 'function')   ? acquireMic()   : Promise.resolve(false);
+  Promise.all([audioP, micP]).then(([_, micOk]) => {
+    if (!micOk) {
+      console.warn('[resume] mic re-acquire failed — disabling VR for the rest of this session');
+      sessionUseVoice = false;
+    } else if (typeof vcStart === 'function') {
+      // vcStart is async — chain catch to surface promise rejections.
+      vcStart().catch(e => console.warn('[resume] vcStart failed:', e));
+    }
+    if (typeof wlAcquire === 'function') wlAcquire('resume');
+    $('resume-overlay').classList.remove('open');
+    $('app').style.visibility = '';
+  }).catch(e => {
+    console.warn('[resume] error:', e);
+    $('resume-overlay').classList.remove('open');
+    $('app').style.visibility = '';
+  });
 }
 
 // ══════════════════════════════════════════════════════
@@ -392,6 +573,7 @@ _startRetestInner(n);
 }
 
 function _startRetestInner(n) {
+if (typeof wlAcquire === 'function') wlAcquire('retest-start');
 retestNote               = n;
 logEvent(`retestStart | note=${n}`);
 firstRoundOfRetest       = true;
@@ -665,13 +847,38 @@ if (el) { el.href = 'mailto:' + u + '@' + d; el.textContent = u + '@' + d; }
 // ══════════════════════════════════════════════════════
 // KEYBOARD SUPPORT
 // ══════════════════════════════════════════════════════
+// Desktop shortcuts. Every keypress also resets the wake-lock idle
+// timer. Action keys (arrows, space, enter, esc) route through
+// context-dispatch.js so voice and keyboard share the same command
+// handlers per-screen. Other keys are ignored.
 document.addEventListener('keydown', e => {
-if (e.key !== ' ' && e.key !== 'Enter') return;
-e.preventDefault();
-if ($('settings-overlay').classList.contains('open')) { closeSettings(); return; }
-if ($('info-overlay').classList.contains('open')) { closeInfo(); return; }
-if ($('start-btn').style.display !== 'none' && $('start-btn').style.display !== '') { handleStart(); return; }
-if (e.key === ' ') { handleTap('left'); } else { handleTap('right'); }
+if (typeof wlOnActivity === 'function') wlOnActivity('keydown');
+const k = e.key;
+
+// Esc → close top overlay
+if (k === 'Escape' || k === 'Esc') {
+  if (dispatchCommand('cmdClose')) { e.preventDefault(); }
+  return;
+}
+
+// Arrow keys + space — only consumed in game contexts where they map.
+// Space/Enter on the StartScreen still triggers Start (legacy behavior).
+const onStartScreen = $('start-btn').style.display !== 'none' && $('start-btn').style.display !== '';
+if (onStartScreen && (k === ' ' || k === 'Enter')) {
+  e.preventDefault();
+  handleStart();
+  return;
+}
+
+let cmd = null;
+if (k === 'ArrowUp')        cmd = 'cmdHigher';
+else if (k === 'ArrowDown') cmd = 'cmdLower';
+else if (k === 'ArrowLeft') cmd = 'cmdReplay';
+else if (k === 'ArrowRight' || k === ' ' || k === 'Enter') cmd = 'cmdContinue';
+if (cmd && dispatchCommand(cmd)) {
+  e.preventDefault();
+  return;
+}
 });
 
 

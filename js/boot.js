@@ -12,6 +12,12 @@ setBg('#4d1903');
 function checkFirstRun() {
 if (!localStorage.getItem('vio4-seen-welcome')) {
   openWelcome();
+  return;
+}
+// Returning user. If voice is opted in globally, show the Hello daily
+// opt-in; otherwise go straight to StartScreen.
+if (settings.voiceCommands) {
+  openHello();
 } else {
   showStartScreen();
 }
@@ -52,8 +58,35 @@ $('lower-half').style.visibility   = 'visible';
 $('diff-value').textContent = fmtC(CENTS_SEQ[centsIdx]);
 }
 
-async function handleStart() {
-await ensureAudio();
+// Start tap. Synchronous gesture-frame entry — kicks off audio (and mic
+// when VR is engaged this session) synchronously and resolves the rest
+// in a .then. iOS Safari closes the permission window on the first
+// async boundary inside a click handler, so the kick MUST happen before
+// any await. Mirrors microbreaker's start-btn-inner pattern.
+function handleStart() {
+const audioP = ensureAudio();
+let micP = Promise.resolve(true);
+// Re-acquire mic if the user opted into voice this session but the
+// stream was invalidated (e.g., persistent-mute auto-release after a
+// background). Idempotent if the stream is already live.
+if (sessionUseVoice && typeof acquireMic === 'function') {
+  micP = acquireMic();
+}
+Promise.all([audioP, micP]).then(([_, micOk]) => {
+  if (sessionUseVoice && !micOk) {
+    console.warn('[start] mic acquisition failed — voice will be unavailable for this round');
+    sessionUseVoice = false;
+  }
+  if (typeof wlAcquire === 'function') wlAcquire('start');
+  _handleStartContinue();
+}).catch(e => {
+  console.warn('[start] error:', e);
+  _handleStartContinue();
+});
+}
+
+// Post-gesture continuation. Soundfont load + round start.
+function _handleStartContinue() {
 hideStartScreen();
 const s = SOUNDS[settings.soundIdx];
 if (s.type === 'sf') {

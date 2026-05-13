@@ -36,6 +36,19 @@ function nukeAudioCtx(reason) {
 async function ensureAudio() {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    console.log('[ctx] created gen=' + audioCtxGeneration + ' state=' + audioCtx.state);
+    // Surface every AudioContext state transition (running/suspended/interrupted/closed).
+    // iOS fires 'interrupted' on phone calls, screen lock, audio-session conflicts;
+    // those events are otherwise invisible. Capture ctx + generation in the closure
+    // so a late-firing statechange on an already-nuked context reports its OWN
+    // identity, not whatever the audioCtx global has been swapped to — crucial for
+    // diagnosing transitions that happen across a nukeAudioCtx() cycle. The
+    // listener is GC'd with the old context after old.close() in nukeAudioCtx.
+    const ctx = audioCtx;
+    const gen = audioCtxGeneration;
+    ctx.addEventListener('statechange', () => {
+      console.log('[ctx] statechange gen=' + gen + ' state=' + ctx.state);
+    });
     masterGain = audioCtx.createGain();
     masterGain.gain.value = (parseFloat(settings.notifyVol) || 0.35) / 0.35;
     masterGain.connect(audioCtx.destination);
@@ -44,23 +57,102 @@ async function ensureAudio() {
     try { await audioCtx.resume(); } catch(e){}
   }
   audioUnlocked = true;
-  // Request 'playback' audio session so audio is not muted by iOS Ring/Silent switch
-  if (navigator.audioSession && navigator.audioSession.type !== 'playback') {
-    try { navigator.audioSession.type = 'playback'; } catch(e){}
+  // Request 'play-and-record' audio session.
+  //
+  // Pre-iOS-18, this was 'playback' (output-only, ignores Ring/Silent
+  // switch). iOS 18 made the category strict: a session created with
+  // 'playback' rejects getUserMedia with
+  //   InvalidStateError: AudioSession category is not compatible with
+  //   audio capture.
+  // We need mic capture in microbreaker (recording, voice commands) and
+  // will need it in ear-tuner (pitch detection / VR), so 'play-and-record'
+  // is correct for every app sharing this module.
+  //
+  // On iOS Web Safari, 'play-and-record' still routes output to the
+  // speaker (not the receiver), so the notification-sound UX is
+  // unchanged. The previous Ring/Silent-switch immunity is the
+  // unavoidable trade-off — getUserMedia simply isn't usable from a
+  // 'playback' session on iOS 18+.
+  if (navigator.audioSession && navigator.audioSession.type !== 'play-and-record') {
+    try { navigator.audioSession.type = 'play-and-record'; } catch(e){}
   }
 }
 
-// iOS zombie-context: state stays 'running' but hardware output is disconnected.
-// Nuke unconditionally — ensureAudio() will recreate on next user gesture.
+// Silence the master gain immediately, cancelling any future scheduled
+// gain envelopes. Call this on backgrounding to prevent in-flight or
+// queued oscillator audio from reaching iOS audio output across the
+// focus-change boundary. Closing the context mid-decay produces audible
+// click/pop artifacts; muting the gain is graceful and reversible —
+// scheduled oscillators continue running but inaudibly, and natural
+// .stop() times will clean them up.
+function muteMasterGain() {
+  if (!audioCtx || !masterGain) return;
+  try {
+    masterGain.gain.cancelScheduledValues(audioCtx.currentTime);
+    masterGain.gain.setValueAtTime(0, audioCtx.currentTime);
+  } catch (e) {}
+}
+
+// Restore master gain to the user's current notifyVol setting. Called on
+// visibility-regain when the AudioContext is healthy and we want to keep
+// playing without forcing the user through a Resume modal.
+function unmuteMasterGain() {
+  if (!audioCtx || !masterGain) return;
+  try {
+    const v = (parseFloat(settings.notifyVol) || 0.35) / 0.35;
+    masterGain.gain.cancelScheduledValues(audioCtx.currentTime);
+    masterGain.gain.setValueAtTime(v, audioCtx.currentTime);
+  } catch (e) {}
+}
+
+// Liveness probe: distinguishes a healthy AudioContext from the iOS
+// "zombie" state where state reads 'running' but currentTime is frozen
+// (WebKit bug 263627, still open as of late 2024). Two-signal check:
+//
+//   1. Safari-only state === 'interrupted' (set on phone calls, screen
+//      lock, some backgrounding paths) — recoverable via resume() but
+//      requires the gesture chain.
+//   2. currentTime advancement: a healthy context advances ~0.1s of clock
+//      in 100ms wall time; a zombie stays exactly at t0 forever. No event
+//      fires for the zombie case — polling is the only signal.
+//
+// Returns true if the context is usable, false if a nuke + rebuild is
+// the right move. Always call this AFTER any in-flight resume() promise
+// settles. ~100ms latency is the cost of detection; acceptable inside
+// the visibility-regain handler since we'd otherwise be opening a modal.
+async function isAudioContextHealthy() {
+  if (!audioCtx) return false;
+  if (audioCtx.state === 'interrupted') {
+    try { await audioCtx.resume(); } catch (e) { return false; }
+  }
+  if (audioCtx.state !== 'running') return false;
+  const t0 = audioCtx.currentTime;
+  await new Promise(r => setTimeout(r, 100));
+  return (audioCtx.currentTime - t0) > 0.05;
+}
+
+// Visibility / pageshow handlers (audio side):
+//
+// The previous design called nukeAudioCtx() unconditionally on every
+// visibility-regain because we couldn't distinguish a zombie from a
+// healthy context. With isAudioContextHealthy() above, we have a probe
+// — so the nuke moves to the orchestration layer (the app's UI handler
+// that knows about MediaRecorder / voice / Resume modal) and only fires
+// when the probe says the context is genuinely broken.
+//
+// All this layer does now is mute master gain on hidden, so any in-flight
+// or scheduled oscillators don't bleed across the boundary. Unmute is
+// driven by the orchestrator after the health probe passes (or by
+// ensureAudio() on the next gesture, post-nuke).
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') {
-    if (audioCtx) nukeAudioCtx('visibility-restore');
+  console.log('[bg] visibilitychange state=' + document.visibilityState);
+  if (document.visibilityState === 'hidden') {
+    muteMasterGain();
   }
 });
 
-// Nuke here too — pageshow may fire without visibilitychange (BFCache)
-window.addEventListener('pageshow', () => {
-  if (audioCtx) nukeAudioCtx('pageshow');
+window.addEventListener('pageshow', (e) => {
+  console.log('[bg] pageshow persisted=' + (e && e.persisted));
   // iOS BFCache restores DOM inline styles including visibility:hidden set by openInfo/openSettings.
   // Always reset to ensure app content is visible on restore.
   const appEl   = document.getElementById('app');
@@ -70,6 +162,18 @@ window.addEventListener('pageshow', () => {
   if (swipeEl) swipeEl.style.visibility = '';
   if (infoEl)  infoEl.classList.remove('open');
 });
+
+// Beep-storm diagnostics — log every lifecycle signal we don't already
+// instrument elsewhere. We've never confirmed which event(s) actually fire
+// during the multi-beep regression, so log them all and let the diag-log
+// transcript expose the real sequence post-incident. No functional change:
+// these handlers ONLY log. Removable once the root cause is known.
+window.addEventListener('pagehide',  (e) => { console.log('[bg] pagehide persisted=' + (e && e.persisted)); });
+window.addEventListener('blur',      () => { console.log('[bg] window-blur'); });
+window.addEventListener('focus',     () => { console.log('[bg] window-focus'); });
+// Page Lifecycle API — Safari ships these on some iOS versions; cheap to listen even when no-op.
+document.addEventListener('freeze',  () => { console.log('[bg] freeze'); });
+document.addEventListener('resume',  () => { console.log('[bg] resume'); });
 
 // iOS/iPadOS: unlock audio context on any touch, in case ensureAudio()
 // was never called (e.g. foot pedal was first interaction)

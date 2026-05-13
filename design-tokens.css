@@ -16,9 +16,11 @@
   --color-blue-break-dark: #080928; /* micro-break vignette edge */
 
   /* Dark-mode surfaces */
-  --color-bg-dark:     #0d0d0d;   /* base body bg / ready-phase edge */
-  --color-bg-surface:  #1e1e1e;   /* primary dark surface */
-  --color-bg-panel:    #1a1a1a;   /* elevated panel (settings, drawers) */
+  --color-bg-dark:           #0d0d0d;   /* base body bg / ready-phase edge */
+  --color-bg-surface:        #1e1e1e;   /* primary dark surface */
+  --color-bg-panel:          #1a1a1a;   /* elevated panel (settings, drawers) */
+  --color-bg-panel-elevated: #2a2a2a;   /* slightly lighter than --color-bg-panel; modal/dialog/floating-progress surfaces (ear-tuner #reset-box, timeliner .tl-dialog-box / .tl-modal-box / .tl-floating-progress) */
+  --color-border-panel:      #3a3a3a;   /* hairline border on elevated panels */
 
   /* Text */
   --color-text-dark:  #2a2018;    /* primary dark text on parchment */
@@ -28,6 +30,9 @@
   /* Fonts */
   --font:         'Inconsolata', monospace;  /* primary — all UI text */
   --font-numeric: 'Nunito', sans-serif;      /* numeric displays (timer, scores) */
+  --font-caption: 'Nunito', sans-serif;      /* AV captions on segment ribbons,
+                                                video overlays, time-tagged
+                                                annotations across apps */
 
   /* Info-page typography — long-form copy on welcome/info/about screens.
      Swap --font-info to retune the reading experience without disturbing

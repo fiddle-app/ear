@@ -230,6 +230,22 @@
         </div>
       </div>
 
+      <div class="s-sec">Voice Recognition</div>
+      <div class="tog-row">
+        <div>
+          <div class="s-label">Listen for voice commands</div>
+          <div class="s-sub">Say "higher", "lower", "replay", "continue", "info", "settings", "close", or a note name like "C sharp four"</div>
+        </div>
+        <label class="tog-sw">
+          <input type="checkbox" id="s-voice-chk" onchange="onVoiceToggle(this.checked)">
+          <div class="tog-track"></div>
+          <div class="tog-thumb"></div>
+        </label>
+      </div>
+      <div class="s-row" id="s-vc-status-row" style="display:none;">
+        <div><div class="s-label">Voice Model</div><div class="s-sub" id="s-vc-status">Idle</div></div>
+      </div>
+
       <div class="s-sec">Diagnostics</div>
       <div class="tog-row">
         <div>
@@ -298,6 +314,40 @@
     <p class="info-p">Tap <button class="welcome-inline-btn" onclick="openSettings()" aria-label="Settings"><svg width="20" height="20" aria-hidden="true"><use href="#icon-gear"/></svg></button> (lower left) to change the instrument or adjust other settings.</p>
     <div class="welcome-push"></div>
     <button id="welcome-get-started" onclick="closeWelcome()">Get Started</button>
+    <div class="welcome-push"></div>
+  </div>
+</div>
+
+<!-- ═══ HELLO OVERLAY — daily VR opt-in (only shown when settings.voiceCommands is on) ═══ -->
+
+<div id="hello-overlay" class="overlay">
+  <div id="hello-content" class="welcome-content-shape">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:4px;">
+      <img src="resources/app-icon-180.png" width="60" height="60" style="border-radius:13px;flex-shrink:0;" alt="Ear Tuner icon"/>
+      <div>
+        <div class="info-heading">Hello!</div>
+        <div class="info-subheading">use voice commands today?</div>
+      </div>
+    </div>
+    <p class="info-p">You can say <strong>"higher"</strong>, <strong>"lower"</strong>, <strong>"replay"</strong>, <strong>"continue"</strong>, <strong>"info"</strong>, <strong>"settings"</strong>, <strong>"close"</strong>, or a note name like <strong>"C sharp four"</strong> to play hands-free.</p>
+    <p class="info-p">Tap <strong>Yes</strong> to grant microphone access for this session. Tap <strong>No</strong> if you'd rather just tap and swipe.</p>
+    <div class="welcome-push"></div>
+    <div style="display:flex;gap:14px;justify-content:center;width:100%;">
+      <button id="hello-yes-btn" onclick="onHelloYes()" style="flex:1;">Yes, use voice</button>
+      <button id="hello-no-btn"  onclick="onHelloNo()"  style="flex:1;">No, not today</button>
+    </div>
+    <div class="welcome-push"></div>
+  </div>
+</div>
+
+<!-- ═══ RESUME OVERLAY — shown after visibility-regain when the mic stream was lost ═══ -->
+
+<div id="resume-overlay" class="overlay">
+  <div id="resume-content" class="welcome-content-shape" style="justify-content:center;">
+    <div class="info-heading" style="text-align:center;">Ready to continue?</div>
+    <p class="info-p" style="text-align:center;">Tap to re-enable the microphone and resume voice commands.</p>
+    <div class="welcome-push"></div>
+    <button id="resume-btn" onclick="closeResume()">Resume</button>
     <div class="welcome-push"></div>
   </div>
 </div>
@@ -377,6 +427,11 @@
   </div>
 </div>
 
+<!-- ═══ VOICE TRANSCRIPT + LOADER ═══ -->
+
+<div id="vc-transcript" aria-live="polite"></div>
+<div id="vc-loader" hidden>Loading voice assets…</div>
+
 <!-- ═══ CONFIRM ═══ -->
 
 <div id="confirm-overlay">
@@ -411,12 +466,20 @@
 <script src="js/persistence.js"></script>
 <script src="js/log.js"></script>
 <script src="js/audio-ctx.js"></script>
+<script src="js/mic.js"></script>
+<script src="js/wakelock.js"></script>
 <script src="js/chime-success.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/game.js"></script>
 <script src="js/safe-area.js"></script>
 <script src="js/render.js"></script>
+<script src="js/context-dispatch.js"></script>
 <script src="js/ui.js"></script>
+<!-- vosk-browser.js (5.5 MB UMD) is lazy-loaded by voice.js's loadVoskScript()
+     on first opt-in (Hello → Yes). Eager-loading on boot would crash the
+     iPhone PWA before the welcome overlay rendered. -->
+<script src="js/voice-commands.js"></script>
+<script src="js/voice.js"></script>
 <script src="js/boot.js"></script>
 </body>
 </html>

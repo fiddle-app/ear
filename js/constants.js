@@ -30,7 +30,7 @@ const VOICE_GAIN = {
 // ══════════════════════════════════════════════════════
 // CONSTANTS
 // ══════════════════════════════════════════════════════
-const BUILD_DATE  = '2026-04-30 18:20';   // stamped by deploy.sh — do not edit manually
+const BUILD_DATE  = '2026-05-13 08:04';   // stamped by deploy.sh — do not edit manually
 const CENTS_SEQ   = [100, 50, 25, 20, 15, 10, 7, 6, 5, 4.5, 4.0, 3.5, 3.0, 2.5, 2.0, 1.5, 1.0, 0.5];
 const MAX_CENTS   = CENTS_SEQ[0]; // 100 — largest/easiest difference
 const fmtC        = c => Number.isInteger(c) ? c+'¢' : c.toFixed(1)+'¢'; // format cents value
@@ -62,7 +62,15 @@ let settings = {
   lowestNote:22, highestNote:53,
   startCentsIdx:5, noteDurIdx:3, attack:1, decay:1, soundIdx:2, testsPerRound:3,
   volume: 1.0,
+  voiceCommands: false,   // global VR opt-in; Hello screen appears daily when true
+  limitVrVocab:  true,    // strict-grammar recognizer for the constrained command set
+  vcKeepLastWord: false,  // diagnostics: keep the last recognized word on screen
 };
+
+// Per-session VR engagement — separate from the persisted setting above.
+// Set by Hello-screen Yes/No each cold launch. Determines whether the
+// visibility-regain Resume modal can fire (no engaged VR → silent rebuild).
+let sessionUseVoice = false;
 let stats = {}; // noteName → { bestCents, attempts }
 
 let currentNote              = null;
