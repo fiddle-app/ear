@@ -11,8 +11,8 @@
 <meta name="theme-color" id="meta-theme" content="#b83c08">
 <!-- Stamped by scripts/deploy.sh — used by the inline version-coherence
      check below to detect a hybrid-cache state at launch. Source ships
-     with 2026-05-13 08:55 as the literal placeholder. -->
-<meta name="ear-tuner-build" content="2026-05-13 08:55">
+     with 2026-05-13 09:05 as the literal placeholder. -->
+<meta name="ear-tuner-build" content="2026-05-13 09:05">
 <!-- PWA home-screen icon. MUST be a real PNG file reference — iOS Safari
      "Add to Home Screen" does not reliably accept data: URLs or JS-generated
      canvas icons. If you change this, test on iPad Safari: Share → Add to
@@ -633,11 +633,15 @@
       <img src="resources/app-icon-180.png" width="60" height="60" style="border-radius:13px;flex-shrink:0;" alt="Ear Tuner icon"/>
       <div>
         <div class="info-heading">Hello!</div>
-        <div class="info-subheading">use voice commands today?</div>
+        <div class="info-subheading">Ready to tune up your ears?</div>
       </div>
     </div>
-    <p class="info-p">You can say <strong>"higher"</strong>, <strong>"lower"</strong>, <strong>"replay"</strong>, <strong>"continue"</strong>, <strong>"info"</strong>, <strong>"settings"</strong>, <strong>"close"</strong>, or a note name like <strong>"C sharp four"</strong> to play hands-free.</p>
-    <p class="info-p">Tap <strong>Yes</strong> to grant microphone access for this session. Tap <strong>No</strong> if you'd rather just tap and swipe.</p>
+    <p class="info-p">You can use voice commands to operate Ear&#8209;Tuner while driving, knitting, or juggling. It drains your battery a bit faster, so you might not want to use it every time.</p>
+    <p class="info-p">You can say <strong>"higher"</strong> or <strong>"lower"</strong> to indicate that the second note is higher/lower, and <strong>"replay"</strong> to hear the notes again.</p>
+    <p class="info-p">Say <strong>"settings"</strong> or <strong>"info"</strong> to go to those screens.</p>
+    <p class="info-p">On the info screen, say <strong>"retest C sharp four"</strong> to retest that note.</p>
+    <p class="info-p"><strong>"Continue"</strong>, <strong>"retry"</strong>, and <strong>"close"</strong> work in the appropriate places.</p>
+    <p class="info-p">Have fun!</p>
     <div class="welcome-push"></div>
     <div style="display:flex;gap:14px;justify-content:center;width:100%;">
       <button id="hello-yes-btn" onclick="onHelloYes()" style="flex:1;">Yes, use voice</button>
