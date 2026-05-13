@@ -8,6 +8,18 @@ function getMasterGainForSettings() {
   return (typeof settings !== 'undefined' && settings) ? settings.volume : 1.0;
 }
 
+// Resolver consumed by _shared/js/audio-ctx.js (ensureAudio) and
+// _shared/js/mic.js (releaseMic). Returns true when the app needs mic
+// access — drives the dynamic audio-session category. Ear-tuner only
+// needs mic when voice recognition is engaged for THIS session
+// (sessionUseVoice). Without VR, returning false lets the shared
+// module use 'playback' category, which routes output through
+// Bluetooth A2DP / car stereo / AirPlay (the routing 'play-and-record'
+// blocks).
+function appWantsMic() {
+  return typeof sessionUseVoice !== 'undefined' && !!sessionUseVoice;
+}
+
 // Audio output destination — masterGain (when audioCtx exists) lets the
 // Volume setting scale every tone, beep, and chime in one place. Falls back
 // to ctx.destination if masterGain is not yet built.
