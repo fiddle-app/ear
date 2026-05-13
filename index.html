@@ -11,8 +11,8 @@
 <meta name="theme-color" id="meta-theme" content="#b83c08">
 <!-- Stamped by scripts/deploy.sh — used by the inline version-coherence
      check below to detect a hybrid-cache state at launch. Source ships
-     with 2026-05-13 09:20 as the literal placeholder. -->
-<meta name="ear-tuner-build" content="2026-05-13 09:20">
+     with 2026-05-13 09:28 as the literal placeholder. -->
+<meta name="ear-tuner-build" content="2026-05-13 09:28">
 <!-- PWA home-screen icon. MUST be a real PNG file reference — iOS Safari
      "Add to Home Screen" does not reliably accept data: URLs or JS-generated
      canvas icons. If you change this, test on iPad Safari: Share → Add to
@@ -124,16 +124,15 @@
   var reloading = false;
   var pollInterval = null;
   function tryDeferredReload() {
+    // In-memory flag is sufficient — dies on actual reload. A
+    // sessionStorage guard was previously here too, but iOS Home-Screen
+    // PWAs don't reliably clear sessionStorage on force-kill, so once
+    // it got set to '1' by one successful update, all subsequent
+    // updates got their reload blocked indefinitely.
     if (reloading) return;
     if (!isSafeToReload()) return;
     reloading = true;
     if (pollInterval !== null) { clearInterval(pollInterval); pollInterval = null; }
-    try {
-      // sessionStorage guard prevents reload loops if multi-update
-      // sequences land in the same session.
-      if (sessionStorage.getItem('et-sw-reloaded') === '1') return;
-      sessionStorage.setItem('et-sw-reloaded', '1');
-    } catch (e) {}
     window.location.reload();
   }
 
