@@ -133,14 +133,33 @@ if (typeof vcOnSettingChange === 'function') vcOnSettingChange('vcKeepLastWord')
 }
 
 // Toggle Voice Recognition on/off (Settings → Voice Recognition).
-// Turning it ON flips the persisted setting; Hello will fire on the
-// next cold launch to gather a daily yes/no. Turning it OFF also stops
-// any running recognizer and disables the Resume modal for this session.
+// Turning it ON: flip persisted setting AND engage VR for THIS session —
+// the change-handler runs inside the user-gesture frame, so we can kick
+// off acquireMic() + vcKickOffLoad() synchronously. Don't make the user
+// wait until next cold launch to actually use voice they just enabled.
+// Turning it OFF: stop the recognizer and disable Resume modal for the
+// rest of this session.
 function onVoiceToggle(enabled) {
 settings.voiceCommands = !!enabled;
 saveSettings();
 renderVoiceSettings();
-if (!enabled) {
+if (enabled) {
+  sessionUseVoice = true;
+  // Synchronous gesture-frame kick: mic + audio first, then vc load.
+  // iOS Safari closes the getUserMedia() permission window after the
+  // first async boundary, so acquireMic MUST be called before any await.
+  const audioP = (typeof ensureAudio === 'function') ? ensureAudio() : Promise.resolve();
+  const micP   = (typeof acquireMic === 'function')   ? acquireMic()   : Promise.resolve(false);
+  if (typeof vcKickOffLoad === 'function') vcKickOffLoad();
+  Promise.all([audioP, micP]).then(([_, micOk]) => {
+    if (!micOk) {
+      console.warn('[settings] mic acquire failed — voice will not engage this session');
+      sessionUseVoice = false;
+      return;
+    }
+    if (typeof wlAcquire === 'function') wlAcquire('settings-voice-on');
+  }).catch(e => console.warn('[settings] voice engage failed:', e));
+} else {
   sessionUseVoice = false;
   if (typeof vcStop === 'function') vcStop();
 }
@@ -464,6 +483,10 @@ function closeResume() {
       console.warn('[resume] mic re-acquire failed — disabling VR for the rest of this session');
       sessionUseVoice = false;
     }
+    // _onMaybeBackgrounded muted master gain; the Resume branch returned
+    // before _onMaybeForegrounded got to its unmute call. Restore it now
+    // that audio is back, otherwise the app stays silent after Resume.
+    if (typeof unmuteMasterGain === 'function') unmuteMasterGain();
     if (typeof wlAcquire === 'function') wlAcquire('resume');
     // Three vc states are possible here:
     //   'ready'     — vc survived: explicit vcStart needed (no auto-start).

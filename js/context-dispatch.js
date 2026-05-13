@@ -83,6 +83,7 @@ const VOICE_CONTEXT_HANDLERS = {
   roundSuccess: {},
   retestListening: {
     cmdReplay:   () => _replayCurrent(),
+    cmdRetry:    () => retryRound(),
     cmdExit:     () => exitRetest(),
     cmdInfo:     () => $('info-btn').click(),
     cmdSettings: () => $('settings-btn').click(),
@@ -91,6 +92,7 @@ const VOICE_CONTEXT_HANDLERS = {
     cmdHigher:   () => handleAnswer(true),
     cmdLower:    () => handleAnswer(false),
     cmdReplay:   () => _replayCurrent(),
+    cmdRetry:    () => retryRound(),
     cmdExit:     () => exitRetest(),
     cmdInfo:     () => $('info-btn').click(),
     cmdSettings: () => $('settings-btn').click(),
@@ -105,6 +107,7 @@ const VOICE_CONTEXT_HANDLERS = {
   },
   retestEnd: {
     cmdBack:     () => exitRetest(),
+    cmdRetry:    () => retryRound(),
     cmdExit:     () => exitRetest(),
     cmdInfo:     () => $('info-btn').click(),
     cmdSettings: () => $('settings-btn').click(),
