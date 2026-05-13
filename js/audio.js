@@ -1,4 +1,13 @@
 'use strict';
+
+// Resolver consumed by _shared/js/audio-ctx.js. Sets the master-gain
+// default used by ensureAudio (initial) and unmuteMasterGain (visibility
+// regain). Ear-tuner drives masterGain directly from settings.volume —
+// the shared module's notifyVol fallback would otherwise pin gain to 1.0.
+function getMasterGainForSettings() {
+  return (typeof settings !== 'undefined' && settings) ? settings.volume : 1.0;
+}
+
 // Audio output destination — masterGain (when audioCtx exists) lets the
 // Volume setting scale every tone, beep, and chime in one place. Falls back
 // to ctx.destination if masterGain is not yet built.

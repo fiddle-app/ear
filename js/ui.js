@@ -501,16 +501,6 @@ function closeResume() {
       console.warn('[resume] mic re-acquire failed — disabling VR for the rest of this session');
       sessionUseVoice = false;
     }
-    // Apply the user's volume setting to the fresh masterGain. Shared
-    // audio-ctx.js defaults to the microbreaker notifyVol scheme, which
-    // doesn't exist in ear-tuner; without this line, volume jumps to
-    // microbreaker's default after the rebuild.
-    if (typeof masterGain !== 'undefined' && masterGain && typeof audioCtx !== 'undefined' && audioCtx) {
-      try {
-        masterGain.gain.cancelScheduledValues(audioCtx.currentTime);
-        masterGain.gain.setValueAtTime(settings.volume, audioCtx.currentTime);
-      } catch (_) {}
-    }
     if (typeof wlAcquire === 'function') wlAcquire('resume');
     if (sessionUseVoice && typeof vc !== 'undefined' && vc && vc.state === 'ready'
         && typeof vcStart === 'function') {
