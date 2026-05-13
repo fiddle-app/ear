@@ -11,8 +11,8 @@
 <meta name="theme-color" id="meta-theme" content="#b83c08">
 <!-- Stamped by scripts/deploy.sh — used by the inline version-coherence
      check below to detect a hybrid-cache state at launch. Source ships
-     with 2026-05-13 08:36 as the literal placeholder. -->
-<meta name="ear-tuner-build" content="2026-05-13 08:36">
+     with 2026-05-13 08:55 as the literal placeholder. -->
+<meta name="ear-tuner-build" content="2026-05-13 08:55">
 <!-- PWA home-screen icon. MUST be a real PNG file reference — iOS Safari
      "Add to Home Screen" does not reliably accept data: URLs or JS-generated
      canvas icons. If you change this, test on iPad Safari: Share → Add to
@@ -84,29 +84,66 @@
   });
 })();
 </script>
-<!-- SW update nudge + controllerchange listener. Inline because a broken
-     cached boot.js could otherwise prevent the user from ever reaching
-     a new version. iOS PWA's default 24h staleness threshold is too
-     slow for our deploy cadence — force a check on every boot.
-     When boot.js loads successfully, it sets window.__etDeferredReloadActive
-     and takes over the controllerchange-→-reload flow with a safe-phase
-     check (no mid-round yank). This inline listener is the safety net
-     for the case where boot.js never loads. -->
+<!-- SW update nudge + controllerchange listener. Inline because:
+     (a) iOS PWA's default 24h staleness threshold is too slow for our
+         deploy cadence — force an update check on every boot;
+     (b) a broken cached boot.js could otherwise prevent the user from
+         ever reaching a new version.
+     The safe-phase logic lives INLINE (not in boot.js) so there's a
+     single listener with no race window. boot.js previously also
+     attached a controllerchange listener, but only after register()
+     resolved — events firing in the gap were lost. -->
 <script>
-if ('serviceWorker' in navigator) {
+(function () {
+  if (!('serviceWorker' in navigator)) return;
   navigator.serviceWorker.getRegistration().then(function (reg) {
     if (reg) reg.update().catch(function () {});
   }).catch(function () {});
-  navigator.serviceWorker.addEventListener('controllerchange', function () {
-    // If boot.js is in charge, defer to its safe-phase logic.
-    if (window.__etDeferredReloadActive) return;
+
+  // Safe to reload when the user isn't mid-tune. "Safe screens" = any
+  // overlay-driven screen (welcome / hello / info / settings / reset)
+  // or the StartScreen (start-btn visible). Resume / upgrade overlays
+  // are explicitly NOT safe — the user is about to interact with them.
+  function isSafeToReload() {
+    var safeOverlays = ['welcome-overlay', 'hello-overlay', 'info-overlay',
+                        'settings-overlay', 'reset-overlay'];
+    for (var i = 0; i < safeOverlays.length; i++) {
+      var el = document.getElementById(safeOverlays[i]);
+      if (el && el.classList.contains('open')) return true;
+    }
+    var blockOverlays = ['resume-overlay', 'upgrade-overlay'];
+    for (var j = 0; j < blockOverlays.length; j++) {
+      var bel = document.getElementById(blockOverlays[j]);
+      if (bel && bel.classList.contains('open')) return false;
+    }
+    var startBtn = document.getElementById('start-btn');
+    if (startBtn && startBtn.style.display !== 'none') return true;
+    return false;
+  }
+
+  var reloading = false;
+  var pollInterval = null;
+  function tryDeferredReload() {
+    if (reloading) return;
+    if (!isSafeToReload()) return;
+    reloading = true;
+    if (pollInterval !== null) { clearInterval(pollInterval); pollInterval = null; }
     try {
+      // sessionStorage guard prevents reload loops if multi-update
+      // sequences land in the same session.
       if (sessionStorage.getItem('et-sw-reloaded') === '1') return;
       sessionStorage.setItem('et-sw-reloaded', '1');
     } catch (e) {}
     window.location.reload();
+  }
+
+  navigator.serviceWorker.addEventListener('controllerchange', function () {
+    // Reload immediately if safe; else poll every 5s until safe.
+    tryDeferredReload();
+    if (pollInterval !== null) clearInterval(pollInterval);
+    pollInterval = setInterval(tryDeferredReload, 5000);
   });
-}
+})();
 </script>
 <!-- Version-coherence check. Compares the build stamped into this HTML
      against the last build the user successfully launched (stored in

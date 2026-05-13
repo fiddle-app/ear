@@ -146,49 +146,11 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.getRegistrations()
       .then(regs => regs.forEach(r => r.unregister()));
   } else {
-    // Auto-update on every launch — iOS home-screen PWAs honour the
-    // browser's built-in 24h update check very loosely. Force a check
-    // now, push any new SW to activate, and reload when safe (only
-    // between rounds, never mid-tune).
-    //
-    // The inline <head> script already listens to controllerchange and
-    // reloads. We add a second listener here that defers the reload
-    // until the user is on a safe screen — between rounds. The inline
-    // listener uses a sessionStorage guard, so once we trigger a reload
-    // here the inline path is a no-op on next controllerchange.
-    let reloadingForUpdate = false;
-    let updatePollInterval = null;
-    function _isSafeToReload() {
-      // Modals + start screen + retest-end are safe.
-      const overlays = ['welcome-overlay', 'hello-overlay', 'info-overlay',
-                        'settings-overlay', 'reset-overlay'];
-      for (const id of overlays) {
-        const el = $(id);
-        if (el && el.classList.contains('open')) return true;
-      }
-      // resume-overlay or upgrade-overlay open — user about to interact, not safe.
-      const block = ['resume-overlay', 'upgrade-overlay'];
-      for (const id of block) {
-        const el = $(id);
-        if (el && el.classList.contains('open')) return false;
-      }
-      // StartScreen visible = between rounds = safe.
-      const startBtn = $('start-btn');
-      if (startBtn && startBtn.style.display !== 'none') return true;
-      // Mid-round (listening / awaiting / retest active) → not safe.
-      return false;
-    }
-    function tryDeferredReload() {
-      if (reloadingForUpdate) return;
-      if (!_isSafeToReload()) return;
-      reloadingForUpdate = true;
-      window.location.reload();
-    }
-    // Signal to the inline <head> controllerchange listener that boot.js
-    // is in charge of reloads now. Without this, the inline listener
-    // would fire first on every controllerchange and yank the user out
-    // of an active round.
-    window.__etDeferredReloadActive = true;
+    // Register SW + push any new install through to activation.
+    // The `controllerchange → reload` flow lives in the inline <head>
+    // script (with safe-phase deferral). Attaching it there avoids the
+    // race where a second listener inside register().then() would miss
+    // the event if controllerchange fires before register resolves.
     navigator.serviceWorker.register('sw.js').then(reg => {
       reg.update().catch(() => {});
       reg.addEventListener('updatefound', () => {
@@ -201,15 +163,6 @@ if ('serviceWorker' in navigator) {
             newSW.postMessage({ type: 'SKIP_WAITING' });
           }
         });
-      });
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        console.log('[sw] controllerchange visible=' + (document.visibilityState === 'visible'));
-        // Reload immediately if already on a safe screen, else poll
-        // every 5s until the user reaches one. Clear any prior poll
-        // first to avoid stacking on multi-update sequences.
-        tryDeferredReload();
-        if (updatePollInterval !== null) clearInterval(updatePollInterval);
-        updatePollInterval = setInterval(tryDeferredReload, 5000);
       });
     });
   }
