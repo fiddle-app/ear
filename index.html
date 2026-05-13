@@ -9,6 +9,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Ear Tuner">
 <meta name="theme-color" id="meta-theme" content="#b83c08">
+<!-- Stamped by scripts/deploy.sh — used by the inline version-coherence
+     check below to detect a hybrid-cache state at launch. Source ships
+     with 2026-05-13 08:30 as the literal placeholder. -->
+<meta name="ear-tuner-build" content="2026-05-13 08:30">
 <!-- PWA home-screen icon. MUST be a real PNG file reference — iOS Safari
      "Add to Home Screen" does not reliably accept data: URLs or JS-generated
      canvas icons. If you change this, test on iPad Safari: Share → Add to
@@ -18,6 +22,178 @@
      §PWA Home-Screen Icon. -->
 <link rel="apple-touch-icon" sizes="180x180" href="resources/app-icon-180.png">
 <link rel="icon" type="image/png" href="resources/app-icon-180.png">
+<!-- Boot watchdog — inline so a broken SW serving stale JS files can't
+     stop it from running. Crash-loop self-healing. Detection model:
+     previous session crashed if it never wrote 'et-clean-shutdown' = '1'.
+     Counter increments on bad shutdowns; resets on clean ones.
+     Threshold of 3 means three crashes in a row. Recovery: unregister SW,
+     clear all caches, hard reload. See microbreaker for the rationale. -->
+<script>
+(function () {
+  var COUNTER_KEY  = 'et-boot-attempts';
+  var CLEAN_KEY    = 'et-clean-shutdown';
+  var SUPPRESS_KEY = 'et-test-suppress-clean';
+  var LIMIT        = 3;
+  var n = 0;
+  try {
+    if (localStorage.getItem(SUPPRESS_KEY) === '1') {
+      localStorage.removeItem(SUPPRESS_KEY);
+    }
+    var prev = localStorage.getItem(CLEAN_KEY);
+    if (prev === '0') {
+      n = (parseInt(localStorage.getItem(COUNTER_KEY) || '0', 10) || 0) + 1;
+    } else {
+      n = 1;
+    }
+    localStorage.setItem(COUNTER_KEY, String(n));
+    localStorage.setItem(CLEAN_KEY, '0');
+  } catch (e) { return; }
+
+  if (n >= LIMIT) {
+    try { console.warn('[boot-watchdog] ' + n + ' bad boots; clearing SW + caches'); } catch (e) {}
+    (async function () {
+      try {
+        if ('serviceWorker' in navigator) {
+          var regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map(function (r) { return r.unregister(); }));
+        }
+        if ('caches' in window) {
+          var keys = await caches.keys();
+          await Promise.all(keys.map(function (k) { return caches.delete(k); }));
+        }
+        try { localStorage.setItem(COUNTER_KEY, '0'); } catch (e) {}
+        try { localStorage.setItem(CLEAN_KEY, '1'); } catch (e) {}
+        window.location.replace(window.location.pathname);
+      } catch (e) {
+        try { console.error('[boot-watchdog] recovery failed:', e); } catch (_) {}
+      }
+    })();
+    return;
+  }
+
+  function markClean() {
+    if (localStorage.getItem(SUPPRESS_KEY) === '1') return;
+    try { localStorage.setItem(CLEAN_KEY, '1'); } catch (e) {}
+  }
+  function markRunning() {
+    try { localStorage.setItem(CLEAN_KEY, '0'); } catch (e) {}
+  }
+  window.addEventListener('pagehide', markClean);
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') markRunning();
+  });
+})();
+</script>
+<!-- SW update nudge + controllerchange listener. Inline because a broken
+     cached boot.js could otherwise prevent the user from ever reaching
+     a new version. iOS PWA's default 24h staleness threshold is too
+     slow for our deploy cadence — force a check on every boot.
+     When boot.js loads successfully, it sets window.__etDeferredReloadActive
+     and takes over the controllerchange-→-reload flow with a safe-phase
+     check (no mid-round yank). This inline listener is the safety net
+     for the case where boot.js never loads. -->
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistration().then(function (reg) {
+    if (reg) reg.update().catch(function () {});
+  }).catch(function () {});
+  navigator.serviceWorker.addEventListener('controllerchange', function () {
+    // If boot.js is in charge, defer to its safe-phase logic.
+    if (window.__etDeferredReloadActive) return;
+    try {
+      if (sessionStorage.getItem('et-sw-reloaded') === '1') return;
+      sessionStorage.setItem('et-sw-reloaded', '1');
+    } catch (e) {}
+    window.location.reload();
+  });
+}
+</script>
+<!-- Version-coherence check. Compares the build stamped into this HTML
+     against the last build the user successfully launched (stored in
+     localStorage). If they differ AND last is non-null, sets
+     window._etUpgrade so the upgrade modal at the top of <body> shows.
+     The placeholder is built via string concatenation so the deploy.sh
+     sed pass on this file cannot match it as a contiguous substring —
+     a literal would turn this into "if current === <build>" and silently
+     suppress the modal on every clean deploy. -->
+<script>
+(function () {
+  var meta    = document.querySelector('meta[name="ear-tuner-build"]');
+  var current = (meta && meta.content) || null;
+  var PLACEHOLDER = '%' + '%BUILD_DATE%' + '%';
+  if (current === PLACEHOLDER) current = null;
+  var last = null;
+  try { last = localStorage.getItem('et-last-build'); } catch (e) {}
+  var action;
+  if (current && last && current !== last) {
+    window._etUpgrade = { from: last, to: current };
+    action = 'mismatch';
+  } else if (current && !last) {
+    window._etUpgrade = null;
+    try { localStorage.setItem('et-last-build', current); } catch (e) {}
+    action = 'first-seen';
+  } else if (current && last === current) {
+    window._etUpgrade = null;
+    action = 'same';
+  } else {
+    window._etUpgrade = null;
+    action = 'no-info';
+  }
+  try {
+    localStorage.setItem('et-boot-decision', JSON.stringify({
+      ts: Date.now(), last: last, current: current, action: action
+    }));
+  } catch (e) {}
+})();
+</script>
+<!-- Self-contained styles for the upgrade modal. Deliberately NOT using
+     design-tokens.css / style.css — those live in separate cached files
+     that may themselves be from a stale version when the upgrade modal
+     needs to display. Hardcoded colors so the modal renders correctly
+     even if every other resource on the page is broken or missing. -->
+<style>
+#upgrade-overlay {
+  position: fixed; inset: 0; z-index: 10000; display: none;
+  background: linear-gradient(180deg, #f1e8d4 0%, #e2d6ba 100%);
+  background-image: radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.10) 100%),
+                    linear-gradient(180deg, #f1e8d4 0%, #e2d6ba 100%);
+  flex-direction: column; align-items: center; justify-content: center;
+  padding: 32px 28px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  color: #2a2118; text-align: center;
+}
+#upgrade-overlay.open { display: flex; }
+#upgrade-title {
+  font-size: 28px; font-weight: 700;
+  margin: 0 0 22px; color: #1f1812;
+  letter-spacing: 0.3px;
+}
+#upgrade-msg { font-size: 17px; line-height: 1.5; margin: 0 0 6px; color: #4a3f33; }
+#upgrade-version {
+  display: block; margin: 4px 0 36px;
+  font-family: 'Inconsolata', ui-monospace, Menlo, Consolas, monospace;
+  font-size: 16px; color: #5a4a3a;
+}
+#upgrade-ok {
+  display: inline-block; padding: 14px 44px;
+  background: linear-gradient(180deg, #d77820 0%, #b56210 100%);
+  color: #fff; font-size: 17px; font-weight: 600;
+  border: none; border-radius: 14px;
+  -webkit-appearance: none; font-family: inherit; cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.30),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.20),
+    0 3px 10px rgba(0, 0, 0, 0.18);
+}
+#upgrade-ok:active {
+  background: linear-gradient(180deg, #b56210 0%, #8c4a08 100%);
+  transform: translateY(1px);
+}
+#upgrade-ok:disabled {
+  background: linear-gradient(180deg, #c8b89a 0%, #a99880 100%);
+  cursor: default; transform: none;
+}
+</style>
 <title>Ear Tuner</title>
 <link rel="stylesheet" href="fonts/fonts.css">
 <link rel="stylesheet" href="design-tokens.css">
@@ -26,6 +202,61 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+<!-- ── UPGRADE MODAL ──────────────────────────────────────────────
+     Shows when the version-coherence check in <head> detected a
+     mismatch between the HTML's stamped build and the last build
+     stored in localStorage. Self-contained: no external CSS or JS
+     deps, so it renders even if the rest of the page is from a
+     stale cache. Tap OK → unregister SW → clear all caches →
+     write new build to localStorage → reload. -->
+<div id="upgrade-overlay" role="dialog" aria-modal="true" aria-labelledby="upgrade-title">
+  <div id="upgrade-title">App Updated</div>
+  <p id="upgrade-msg">Ear Tuner has been upgraded to</p>
+  <code id="upgrade-version">—</code>
+  <button id="upgrade-ok" type="button">OK</button>
+</div>
+<script>
+(function () {
+  var up = window._etUpgrade;
+  if (!up) return;
+  var ov  = document.getElementById('upgrade-overlay');
+  var ver = document.getElementById('upgrade-version');
+  var btn = document.getElementById('upgrade-ok');
+  if (!ov || !btn) return;
+  if (ver) ver.textContent = up.to;
+  ov.classList.add('open');
+  // Disable OK for 1500ms so ghost taps from launching the app icon
+  // (a finger still hovering when the modal renders) cannot immediately
+  // dismiss it. Visible state: dimmed.
+  btn.disabled = true;
+  setTimeout(function () { btn.disabled = false; }, 1500);
+  btn.addEventListener('click', function () {
+    btn.disabled = true;
+    btn.textContent = 'Updating…';
+    var finish = function () {
+      try { localStorage.setItem('et-last-build', up.to); } catch (e) {}
+      window.location.replace(window.location.pathname);
+    };
+    var p = Promise.resolve();
+    if ('serviceWorker' in navigator) {
+      p = p.then(function () {
+        return navigator.serviceWorker.getRegistrations().then(function (regs) {
+          return Promise.all(regs.map(function (r) { return r.unregister(); }));
+        });
+      }).catch(function () {});
+    }
+    if (window.caches) {
+      p = p.then(function () {
+        return caches.keys().then(function (keys) {
+          return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+        });
+      }).catch(function () {});
+    }
+    p.then(finish, finish);
+  });
+})();
+</script>
 
 <!-- SPRITE-INLINE -->
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
@@ -245,6 +476,28 @@
       <div class="s-row" id="s-vc-status-row" style="display:none;">
         <div><div class="s-label">Voice Model</div><div class="s-sub" id="s-vc-status">Idle</div></div>
       </div>
+      <div class="tog-row" id="s-limit-vr-row" style="display:none;">
+        <div>
+          <div class="s-label">Limit VR Vocabulary</div>
+          <div class="s-sub">Strict grammar — recognizer rejects words outside the command set</div>
+        </div>
+        <label class="tog-sw">
+          <input type="checkbox" id="s-limit-vr" onchange="onLimitVrToggle(this.checked)">
+          <div class="tog-track"></div>
+          <div class="tog-thumb"></div>
+        </label>
+      </div>
+      <div class="tog-row" id="s-vc-keep-row" style="display:none;">
+        <div>
+          <div class="s-label">Keep last word on-screen</div>
+          <div class="s-sub">Hold the last recognized word until the next one (diagnostic)</div>
+        </div>
+        <label class="tog-sw">
+          <input type="checkbox" id="s-vc-keep" onchange="onVcKeepToggle(this.checked)">
+          <div class="tog-track"></div>
+          <div class="tog-thumb"></div>
+        </label>
+      </div>
 
       <div class="s-sec">Diagnostics</div>
       <div class="tog-row">
@@ -272,8 +525,25 @@
       </div>
 
       <div class="s-row">
-        <div><div class="s-label">App Version</div><div class="s-sub" id="s-build-date"></div></div>
+        <div>
+          <div class="s-label">App Version</div>
+          <div class="s-sub" id="s-build-date"></div>
+          <div class="s-sub" id="s-sw-status" style="margin-top:1px; white-space: pre-line;"></div>
+        </div>
         <button class="log-action-btn" onclick="reloadFromServer()">Reload</button>
+      </div>
+
+      <div class="s-row">
+        <div style="flex:1;"><div class="s-label">Memory</div><div class="s-sub" id="s-mem-status">—</div></div>
+        <button id="s-mem-refresh" class="log-action-btn">Refresh</button>
+      </div>
+
+      <div class="s-row" style="flex-direction:column; align-items:stretch; gap:6px; padding: 8px 0;">
+        <div class="s-label">Hard reset</div>
+        <div class="s-sub" style="line-height: 1.5;">
+          Wipes ALL local data — settings, log, voice cache, service worker. Requires internet on next launch. Use only if Reload doesn't help (fonts broken, version blank, app behaving strangely).
+        </div>
+        <button id="s-hard-reset-btn" class="log-action-btn" style="background: rgba(220,80,80,0.18); color: rgba(255,200,200,0.95);">Hard reset</button>
       </div>
 
       <button id="s-reset-btn" onclick="openResetDefaults()">Reset to defaults…</button>

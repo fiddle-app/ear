@@ -282,6 +282,25 @@ function vcStop() {
   if (el) el.classList.remove('visible');
 }
 
+// Tear down the voice-commands instance entirely, freeing the ~80MB
+// Vosk WASM heap. Used by the visibility-regain Branch C silent
+// rebuild — discarding vc forces vcKickOffLoad to rebuild from scratch,
+// reading the model from the /vosk IDB cache (~0.6s, no network).
+// Idempotent.
+function vcDestroy() {
+  if (!vc) return;
+  try { vc.destroy(); } catch (_) {}
+  vc = null;
+  _vcLastState = null;
+  if (_vcTranscriptClearTimer) {
+    clearTimeout(_vcTranscriptClearTimer);
+    _vcTranscriptClearTimer = null;
+  }
+  const el = $('vc-transcript');
+  if (el) el.classList.remove('visible');
+  vcUpdateStatus('Idle');
+}
+
 // Rebuild the recognizer's command list (cheap — Phase 1 recognizer-only
 // rebuild). Called when settings affecting the vocabulary change
 // (lowestNote / highestNote / limitVrVocab).
@@ -300,6 +319,20 @@ function vcOnSettingChange(name) {
       // Will engage on next Hello prompt; nothing to do here.
     } else {
       vcStop();
+    }
+    return;
+  }
+  if (name === 'vcKeepLastWord') {
+    // No recognizer rebuild. If toggling off while a final word is held
+    // on-screen, schedule a normal 2s clear so it fades naturally.
+    if (!settings.vcKeepLastWord && !_vcTranscriptClearTimer) {
+      const el = $('vc-transcript');
+      if (el && el.classList.contains('visible')) {
+        _vcTranscriptClearTimer = setTimeout(() => {
+          el.classList.remove('visible');
+          _vcTranscriptClearTimer = null;
+        }, 2000);
+      }
     }
     return;
   }

@@ -109,6 +109,27 @@ const chk = $('s-voice-chk');
 if (chk) chk.checked = !!settings.voiceCommands;
 const row = $('s-vc-status-row');
 if (row) row.style.display = settings.voiceCommands ? '' : 'none';
+// Diagnostic toggles only meaningful when voice is enabled.
+const limitRow = $('s-limit-vr-row');
+if (limitRow) limitRow.style.display = settings.voiceCommands ? '' : 'none';
+const keepRow = $('s-vc-keep-row');
+if (keepRow) keepRow.style.display = settings.voiceCommands ? '' : 'none';
+const limitChk = $('s-limit-vr');
+if (limitChk) limitChk.checked = !!settings.limitVrVocab;
+const keepChk = $('s-vc-keep');
+if (keepChk) keepChk.checked = !!settings.vcKeepLastWord;
+}
+
+function onLimitVrToggle(enabled) {
+settings.limitVrVocab = !!enabled;
+saveSettings();
+if (typeof vcOnSettingChange === 'function') vcOnSettingChange('limitVrVocab');
+}
+
+function onVcKeepToggle(enabled) {
+settings.vcKeepLastWord = !!enabled;
+saveSettings();
+if (typeof vcOnSettingChange === 'function') vcOnSettingChange('vcKeepLastWord');
 }
 
 // Toggle Voice Recognition on/off (Settings → Voice Recognition).
@@ -169,6 +190,8 @@ settingsOpenTestsPerRound = settings.testsPerRound;
 const s=SOUNDS[settings.soundIdx];
 if (s.type==='sf'&&!sfInstruments[s.sfName]) loadSfInstrument(s.sfName).then(()=>renderSoundGrid()).catch(()=>{});
 renderSettings();
+renderSwStatus();
+renderMemStatus();
 setBg('#1a1a1a');
 $('settings-overlay').classList.add('open');
 $('info-btn').style.visibility = 'hidden';
@@ -291,71 +314,166 @@ function onHelloNo() {
 // ══════════════════════════════════════════════════════
 // VISIBILITY RECOVERY + RESUME MODAL
 // ══════════════════════════════════════════════════════
-// Probe-and-rebuild model (2026-05-09): only getUserMedia truly needs
-// a fresh user-gesture frame. AudioContext, audioCtx.resume(), Vosk
-// reload, and AudioWorkletNode construction all work outside a gesture
-// once the session has had at least one earlier gesture. So the Resume
+// Probe-and-rebuild model — only getUserMedia truly needs a fresh
+// user-gesture frame. AudioContext, audioCtx.resume(), Vosk reload,
+// and AudioWorkletNode construction all work outside a gesture once
+// the session has had at least one earlier gesture. So the Resume
 // modal is reserved for the case where iOS invalidated the mic stream
-// AND we still want VR — when sessionUseVoice is false, we silently
-// rebuild audio and skip the modal.
-let _foregroundedInFlight = false;
+// AND we still want VR. See _shared/js/visibility-recovery.md.
+//
+// _wasBackgrounded latches across pagehide/visibilitychange so we
+// don't double-run the recovery cycle when multiple events fire for
+// the same transition. blur/focus deliberately NOT used — iOS system
+// overlays (mic permission prompt, Control Center) trigger blur and
+// would cause spurious Resume modals.
+let _wasBackgrounded = false;
+let _resumeReason = null;
 
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') _onMaybeForegrounded();
+  if (document.visibilityState === 'hidden')      _onMaybeBackgrounded();
+  else if (document.visibilityState === 'visible') _onMaybeForegrounded();
 });
-window.addEventListener('pageshow', () => _onMaybeForegrounded());
-window.addEventListener('focus',    () => _onMaybeForegrounded());
+window.addEventListener('pagehide', _onMaybeBackgrounded);
+window.addEventListener('pageshow', _onMaybeForegrounded);
 
-function _onMaybeForegrounded() {
-  if (_foregroundedInFlight) return;
-  if (document.visibilityState !== 'visible') return;
-  _foregroundedInFlight = true;
-  (async () => {
-    try {
-      // Silent audio rebuild if needed. ensureAudio is idempotent and
-      // will resume / re-create the AudioContext as required.
-      if (typeof ensureAudio === 'function') {
-        try { await ensureAudio(); } catch (e) { console.warn('[fg] ensureAudio failed:', e); }
-      }
-      const wantsMic = sessionUseVoice;
-      if (wantsMic) {
-        const live = (typeof micStreamIsLive === 'function') ? micStreamIsLive() : false;
-        if (!live) {
-          // iOS invalidated the stream. Need a fresh gesture — show Resume.
-          showResume();
-          return;
-        }
-      }
-      // Either we don't need a mic, or the stream is still alive. Reset
-      // the wake-lock idle timer; if intent is still set, try to reacquire
-      // the sentinel (best-effort outside a real gesture).
-      if (typeof wlOnActivity === 'function') wlOnActivity('visibility-regain');
-    } finally {
-      _foregroundedInFlight = false;
-    }
-  })();
+function _onMaybeBackgrounded() {
+  if (_wasBackgrounded) return;
+  _wasBackgrounded = true;
+  console.log('[gate] backgrounded');
+  if (typeof muteMasterGain === 'function') muteMasterGain();
+  if (typeof vcStop === 'function') vcStop();
 }
 
-function showResume() {
+async function _onMaybeForegrounded() {
+  if (!_wasBackgrounded) return;
+  _wasBackgrounded = false;
+  if (document.visibilityState !== 'visible') return;
+
+  // ── Probe both health signals ────────────────────────────────────
+  const audioOk = (typeof isAudioContextHealthy === 'function')
+    ? await isAudioContextHealthy()
+    : false;
+  const wantMic = !!sessionUseVoice;
+  const micOk   = !wantMic || (typeof micStreamIsLive === 'function' && micStreamIsLive());
+  console.log('[gate] foregrounded — audioOk=' + audioOk + ' micOk=' + micOk);
+
+  // ── Branch A: mic invalidated → Resume modal (gesture needed) ────
+  if (!micOk) {
+    if (typeof micStream !== 'undefined' && micStream) {
+      try { micStream.getTracks().forEach(t => t.stop()); } catch (_) {}
+      micStream = null;
+    }
+    if (!audioOk && typeof nukeAudioCtx === 'function') {
+      nukeAudioCtx('regain-unhealthy');
+    }
+    showResume(audioOk ? 'mic-stale' : 'audio-and-mic');
+    return;
+  }
+
+  // ── Branch B: audio unhealthy, mic alive → silent audio rebuild ──
+  if (!audioOk) {
+    console.log('[gate] silent rebuild — audio unhealthy');
+    if (typeof nukeAudioCtx === 'function') nukeAudioCtx('regain-unhealthy');
+    await ensureAudio();
+    const audioOk2 = (typeof isAudioContextHealthy === 'function')
+      ? await isAudioContextHealthy()
+      : true;
+    if (!audioOk2) {
+      console.log('[gate] silent audio rebuild failed — escalating to Resume');
+      showResume('audio-unhealthy');
+      return;
+    }
+  }
+
+  // From here on, audio + mic are both healthy (either survived bg or
+  // were silently rebuilt). Restore output gain.
+  if (typeof unmuteMasterGain === 'function') unmuteMasterGain();
+
+  // Reset wake-lock idle timer; best-effort re-acquire outside a gesture.
+  if (typeof wlOnActivity === 'function') wlOnActivity('visibility-regain');
+
+  if (!sessionUseVoice) return;
+
+  // ── Branch C: voice resume ───────────────────────────────────────
+  if (typeof vcStart === 'function') {
+    const vrOk = await vcStart();
+    if (vrOk) return;
+
+    // vcStart failed — typically DataCloneError on the worklet port
+    // transfer (iOS suspends the AudioWorklet processor independently
+    // of the AudioContext rendering thread). Tear down vc and rebuild
+    // silently. Model reads from /vosk IDB cache (~0.6s, no network).
+    console.log('[gate] silent rebuild — vc failed (worklet zombie)');
+    if (typeof vcDestroy === 'function') vcDestroy();
+    if (typeof nukeAudioCtx === 'function') nukeAudioCtx('vcStart-failed-silent');
+    await ensureAudio();
+    const audioOk3 = (typeof isAudioContextHealthy === 'function')
+      ? await isAudioContextHealthy()
+      : true;
+    if (!audioOk3) {
+      console.log('[gate] silent vc rebuild — fresh audioCtx still unhealthy, escalating to Resume');
+      showResume('vc-failure');
+      return;
+    }
+    if (typeof vcKickOffLoad === 'function') vcKickOffLoad();
+    // Auto-start in vcOnStateChange fires vcStart on loading→ready.
+  }
+}
+
+function showResume(reason) {
   const ov = $('resume-overlay');
   if (!ov) return;
+  if (!sessionUseVoice) return;
+  _resumeReason = reason || 'unknown';
   ov.classList.add('open');
   $('app').style.visibility = 'hidden';
 }
 
-// Resume tap — fresh user gesture frame. Kicks audio + mic synchronously.
+// Resume tap — fresh user gesture frame. Kicks audio + mic synchronously
+// (iOS requires the gesture for getUserMedia). Reason-specific routing:
+// 'vc-failure' would normally wipe IDB and re-download (heaviest path),
+// but ear-tuner doesn't implement vcWipeAndRebuild yet — falls through
+// to vcKickOffLoad which still recovers from the worklet-zombie case via
+// cache reload.
 function closeResume() {
+  const reason = _resumeReason;
+  _resumeReason = null;
+
+  // Pre-flight: drop a dead micStream so acquireMic fires inside this
+  // gesture frame. Live stream is reused to avoid iOS's mic-toggle ping.
+  if (typeof micStream !== 'undefined' && micStream &&
+      typeof micStreamIsLive === 'function' && !micStreamIsLive()) {
+    try { micStream.getTracks().forEach(t => t.stop()); } catch (_) {}
+    micStream = null;
+  }
+
   const audioP = (typeof ensureAudio === 'function') ? ensureAudio() : Promise.resolve();
-  const micP   = (typeof acquireMic === 'function')   ? acquireMic()   : Promise.resolve(false);
+  const wantMic = !!sessionUseVoice;
+  const micP   = (wantMic && (typeof micStream === 'undefined' || !micStream) &&
+                  typeof acquireMic === 'function')
+    ? acquireMic()
+    : Promise.resolve(true);
+
+  console.log('[gate] resume rebuild — reason=' + reason + ' voiceArmed=' + sessionUseVoice);
+
+  if (sessionUseVoice && typeof vcKickOffLoad === 'function') {
+    vcKickOffLoad();
+  }
   Promise.all([audioP, micP]).then(([_, micOk]) => {
-    if (!micOk) {
+    if (wantMic && !micOk) {
       console.warn('[resume] mic re-acquire failed — disabling VR for the rest of this session');
       sessionUseVoice = false;
-    } else if (typeof vcStart === 'function') {
-      // vcStart is async — chain catch to surface promise rejections.
-      vcStart().catch(e => console.warn('[resume] vcStart failed:', e));
     }
     if (typeof wlAcquire === 'function') wlAcquire('resume');
+    // Three vc states are possible here:
+    //   'ready'     — vc survived: explicit vcStart needed (no auto-start).
+    //   'loading'   — vc was rebuilt by vcKickOffLoad: auto-start on
+    //                 loading→ready fires from vcOnStateChange.
+    //   'listening' — defensive; vcStart is a no-op there.
+    if (sessionUseVoice && typeof vc !== 'undefined' && vc && vc.state === 'ready'
+        && typeof vcStart === 'function') {
+      vcStart().catch(e => console.warn('[resume] vcStart failed:', e));
+    }
     $('resume-overlay').classList.remove('open');
     $('app').style.visibility = '';
   }).catch(e => {
@@ -881,4 +999,150 @@ if (cmd && dispatchCommand(cmd)) {
 }
 });
 
+// ══════════════════════════════════════════════════════
+// DIAGNOSTICS (Settings → Diagnostics)
+// ══════════════════════════════════════════════════════
+
+// SW + cache version visibility. Shows what's currently active vs. what
+// would activate on next reload. When they diverge, it's a nudge to hit
+// Reload (or Hard reset, if Reload won't take).
+async function renderSwStatus() {
+  const el = $('s-sw-status');
+  if (!el) return;
+  if (!('serviceWorker' in navigator) || !window.caches) {
+    el.textContent = 'service worker: unavailable';
+    return;
+  }
+  try {
+    const keys = await caches.keys();
+    const staticKey = keys.find(k => k.startsWith('ear-tuner-static-'));
+    const activeVer = staticKey ? staticKey.replace('ear-tuner-static-', '') : '(none)';
+    const reg = await navigator.serviceWorker.getRegistration();
+    const waiting = reg && (reg.waiting || reg.installing);
+    let line = 'cache: ' + activeVer;
+    if (activeVer !== BUILD_DATE) line += ' ⚠ mismatched';
+    if (waiting) line += ' · update pending';
+    // Second line: inline-script's view of the same state. When all three
+    // sources (cache, last-seen, meta) agree, the system is coherent.
+    let lastSeen = null;
+    try { lastSeen = localStorage.getItem('et-last-build'); } catch (_) {}
+    let metaBuild = null;
+    const metaEl = document.querySelector('meta[name="ear-tuner-build"]');
+    if (metaEl) metaBuild = metaEl.content;
+    line += '\nlast-seen: ' + (lastSeen || '(unset)') +
+            ' · meta: ' + (metaBuild || '(missing)');
+    // Third line: most recent boot decision from the inline coherence
+    // check. Action values: mismatch / first-seen / same / no-info.
+    let decision = null;
+    try { decision = JSON.parse(localStorage.getItem('et-boot-decision') || 'null'); } catch (_) {}
+    if (decision) {
+      line += '\nboot decision: ' + decision.action +
+              ' (last=' + (decision.last || 'null') +
+              ' current=' + (decision.current || 'null') + ')';
+    }
+    el.textContent = line;
+  } catch (e) {
+    el.textContent = 'cache: (error)';
+  }
+}
+
+// performance.memory snapshot. Chrome-only — Safari (incl. iOS PWA)
+// does not expose it. On Safari the line still shows app-state sizes so
+// the panel gives some signal.
+function renderMemStatus() {
+  const el = $('s-mem-status');
+  if (!el) return;
+  const parts = [];
+  if (typeof performance !== 'undefined' && performance.memory) {
+    const m = performance.memory;
+    parts.push(
+      'JS heap: ' + (m.usedJSHeapSize / 1048576).toFixed(1) +
+      ' / ' + (m.totalJSHeapSize / 1048576).toFixed(1) +
+      ' MB (limit ' + (m.jsHeapSizeLimit / 1048576).toFixed(0) + ' MB)'
+    );
+  } else {
+    parts.push('JS heap: not exposed by this browser (Chrome desktop only)');
+  }
+  if (typeof vc !== 'undefined' && vc) {
+    parts.push('vc model: ' + (vc.state || 'unknown'));
+  }
+  el.textContent = parts.join(' · ');
+}
+
+if ($('s-mem-refresh')) {
+  $('s-mem-refresh').addEventListener('click', renderMemStatus);
+}
+
+// Hard reset — order matters:
+//   1. SW unregister first — no in-flight fetches against caches we're about to delete.
+//   2. Caches second.
+//   3. localStorage third — settings, boot watchdog state, last-build all go.
+//   4. IndexedDB last — Vosk's worker connections resolve best after the
+//      other state is gone.
+async function hardReset() {
+  if (!confirm('Hard reset will delete ALL local data (settings, log, voice cache, service worker) and require internet on next launch. Continue?')) return;
+  const btn = $('s-hard-reset-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Resetting…'; }
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    if (window.caches) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+    try { localStorage.clear(); } catch (_) {}
+    if (window.indexedDB) {
+      try {
+        if (indexedDB.databases) {
+          const dbs = await indexedDB.databases();
+          await Promise.all(dbs.map(({ name }) => name && new Promise((resolve) => {
+            const req = indexedDB.deleteDatabase(name);
+            req.onsuccess = req.onerror = req.onblocked = () => resolve();
+          })));
+        } else {
+          // Safari historically lacked indexedDB.databases() — fall back to
+          // the known DB names used by the Vosk voice library.
+          ['/vosk', 'voice-models'].forEach(n => { try { indexedDB.deleteDatabase(n); } catch (_) {} });
+        }
+      } catch (_) {}
+    }
+    // location.replace (not reload) — back-button history shouldn't return here.
+    window.location.replace(window.location.pathname);
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Hard reset'; }
+    alert('Hard reset failed: ' + (e && e.message) + ' — try again, or remove the home-screen icon and re-add from Safari.');
+  }
+}
+
+if ($('s-hard-reset-btn')) {
+  $('s-hard-reset-btn').addEventListener('click', hardReset);
+}
+
+// Bulletproof "I want the latest" — unregister all SWs and delete every
+// cache so the reload hits raw network. Critical safety check: probe the
+// origin BEFORE wiping. If offline, abort — never strand the user with
+// no SW + no cache + no network. navigator.onLine is unreliable on iOS,
+// so we use a real cache-busted fetch.
+async function reloadFromServer() {
+  try {
+    const probe = await fetch('sw.js?reload-probe=' + Date.now(), { cache: 'no-store' });
+    if (!probe.ok) throw new Error('probe non-ok: ' + probe.status);
+  } catch (_) {
+    alert('Cannot reach the server right now. Reload aborted — reconnect to the internet and try again.');
+    return;
+  }
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    if (window.caches) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+  } catch (e) { /* ignore — reload anyway */ }
+  window.location.replace(window.location.pathname);
+}
 
