@@ -11,8 +11,8 @@
 <meta name="theme-color" id="meta-theme" content="#b83c08">
 <!-- Stamped by scripts/deploy.sh — used by the inline version-coherence
      check below to detect a hybrid-cache state at launch. Source ships
-     with 2026-05-13 12:30 as the literal placeholder. -->
-<meta name="ear-tuner-build" content="2026-05-13 12:30">
+     with 2026-05-13 12:36 as the literal placeholder. -->
+<meta name="ear-tuner-build" content="2026-05-13 12:36">
 <!-- PWA home-screen icon. MUST be a real PNG file reference — iOS Safari
      "Add to Home Screen" does not reliably accept data: URLs or JS-generated
      canvas icons. If you change this, test on iPad Safari: Share → Add to
@@ -545,19 +545,8 @@
       </div>
 
       <div class="s-sec">Diagnostics</div>
-      <div class="tog-row">
-        <div>
-          <div class="s-label">Enable Logging</div>
-          <div class="s-sub">Logs actions for debugging</div>
-        </div>
-        <label class="tog-sw">
-          <input type="checkbox" id="s-logging-chk" onchange="onLoggingToggle(this.checked)">
-          <div class="tog-track"></div>
-          <div class="tog-thumb"></div>
-        </label>
-      </div>
-      <div class="s-row" id="s-copy-log-row" style="display:none;">
-        <div><div class="s-label">Debug Log</div><div class="s-sub" id="s-log-count">0 entries</div></div>
+      <div class="s-row">
+        <div><div class="s-label">Debug Log</div><div class="s-sub">Captures lifecycle events for crash diagnosis</div></div>
         <div style="display:flex;gap:8px;">
           <button id="s-copy-log-btn" class="log-action-btn" onclick="copyLog()">Copy</button>
           <button class="log-action-btn" onclick="clearLog()">Clear</button>
@@ -786,7 +775,11 @@
 <script src="soundfont-player.min.js"></script>
 <script src="js/constants.js"></script>
 <script src="js/persistence.js"></script>
-<script src="js/log.js"></script>
+<!-- Diag-log prefix MUST be set before diag-log.js loads — keys all
+     LS storage and the boot-watchdog helpers. Matches the hardcoded
+     'et-' prefix in the inline boot-watchdog at the top of <head>. -->
+<script>window.__DIAG_LOG_PREFIX__ = 'et';</script>
+<script src="js/diag-log.js"></script>
 <script src="js/audio-ctx.js"></script>
 <script src="js/mic.js"></script>
 <script src="js/wakelock.js"></script>

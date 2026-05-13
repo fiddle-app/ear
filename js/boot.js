@@ -2,7 +2,6 @@
 // BOOT
 // ══════════════════════════════════════════════════════
 loadState();
-loadLoggingState();
 centsIdx=settings.startCentsIdx;
 renderSettings();
 updateRetestUI();
