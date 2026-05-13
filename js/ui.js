@@ -100,7 +100,6 @@ $('s-volume-slider').value     = volPct;
 $('s-volume-val').textContent  = volPct + '%';
 renderSoundGrid();
 renderVoiceSettings();
-updateLogUI();
 }
 
 // Voice Recognition settings row sync.
