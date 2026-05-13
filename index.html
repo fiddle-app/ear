@@ -11,8 +11,8 @@
 <meta name="theme-color" id="meta-theme" content="#b83c08">
 <!-- Stamped by scripts/deploy.sh — used by the inline version-coherence
      check below to detect a hybrid-cache state at launch. Source ships
-     with 2026-05-13 09:05 as the literal placeholder. -->
-<meta name="ear-tuner-build" content="2026-05-13 09:05">
+     with 2026-05-13 09:15 as the literal placeholder. -->
+<meta name="ear-tuner-build" content="2026-05-13 09:15">
 <!-- PWA home-screen icon. MUST be a real PNG file reference — iOS Safari
      "Add to Home Screen" does not reliably accept data: URLs or JS-generated
      canvas icons. If you change this, test on iPad Safari: Share → Add to
@@ -236,6 +236,7 @@
 <link rel="stylesheet" href="design-tokens.css">
 <link rel="stylesheet" href="design-tokens-app.css">
 <link rel="stylesheet" href="glyph-disc.css">
+<link rel="stylesheet" href="resume-modal.css">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -271,26 +272,34 @@
   btn.addEventListener('click', function () {
     btn.disabled = true;
     btn.textContent = 'Updating…';
-    var finish = function () {
-      try { localStorage.setItem('et-last-build', up.to); } catch (e) {}
-      window.location.replace(window.location.pathname);
-    };
-    var p = Promise.resolve();
+    // Persist the new build IMMEDIATELY — before any async cleanup that
+    // could hang. iOS PWA has been observed to hang on
+    // serviceWorker.unregister() / caches.delete() indefinitely; without
+    // this early write, a hang on the wipe leaves et-last-build stale
+    // and the modal re-fires on the next launch. The cleanup itself is
+    // defense-in-depth; the SW will serve fresh content on reload
+    // regardless.
+    try { localStorage.setItem('et-last-build', up.to); } catch (e) {}
+    var doReload = function () { window.location.replace(window.location.pathname); };
+    // Cleanup chain, raced against a 3s timeout. Whichever completes
+    // first triggers the reload.
+    var cleanup = Promise.resolve();
     if ('serviceWorker' in navigator) {
-      p = p.then(function () {
+      cleanup = cleanup.then(function () {
         return navigator.serviceWorker.getRegistrations().then(function (regs) {
           return Promise.all(regs.map(function (r) { return r.unregister(); }));
         });
       }).catch(function () {});
     }
     if (window.caches) {
-      p = p.then(function () {
+      cleanup = cleanup.then(function () {
         return caches.keys().then(function (keys) {
           return Promise.all(keys.map(function (k) { return caches.delete(k); }));
         });
       }).catch(function () {});
     }
-    p.then(finish, finish);
+    var timeout = new Promise(function (resolve) { setTimeout(resolve, 3000); });
+    Promise.race([cleanup, timeout]).then(doReload, doReload);
   });
 })();
 </script>
@@ -622,6 +631,7 @@
     <div class="welcome-push"></div>
     <button id="welcome-get-started" onclick="closeWelcome()">Get Started</button>
     <div class="welcome-push"></div>
+    <div class="launch-build-date" id="welcome-build-date"></div>
   </div>
 </div>
 
@@ -648,18 +658,20 @@
       <button id="hello-no-btn"  onclick="onHelloNo()"  style="flex:1;">No, not today</button>
     </div>
     <div class="welcome-push"></div>
+    <div class="launch-build-date" id="hello-build-date"></div>
   </div>
 </div>
 
-<!-- ═══ RESUME OVERLAY — shown after visibility-regain when the mic stream was lost ═══ -->
-
-<div id="resume-overlay" class="overlay">
-  <div id="resume-content" class="welcome-content-shape" style="justify-content:center;">
-    <div class="info-heading" style="text-align:center;">Ready to continue?</div>
-    <p class="info-p" style="text-align:center;">Tap to re-enable the microphone and resume voice commands.</p>
-    <div class="welcome-push"></div>
-    <button id="resume-btn" onclick="closeResume()">Resume</button>
-    <div class="welcome-push"></div>
+<!-- RESUME SCREEN — modal dialog over current screen on visibility-restore.
+     Per Apple, restarting the microphone after a backgrounding requires a
+     fresh user gesture; this overlay makes that explicit instead of
+     silently waiting for the user to tap something. Styles live in the
+     shared resume-modal.css (synced from _shared/design/). -->
+<div id="resume-overlay">
+  <div id="resume-box">
+    <div id="resume-title">Welcome back</div>
+    <p id="resume-msg">We lost our audio while you were away. Click resume to restore it.</p>
+    <button id="resume-btn-action" onclick="closeResume()">Resume</button>
   </div>
 </div>
 

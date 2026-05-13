@@ -244,6 +244,8 @@ function openWelcome() {
 showStartScreen();
 welcomeIsOpen = true;
 setBg('#f5efe6');
+const wbd = $('welcome-build-date');
+if (wbd) wbd.textContent = 'build ' + (typeof BUILD_DATE === 'string' ? BUILD_DATE : '(unknown)');
 $('welcome-overlay').classList.add('open');
 $('app').style.visibility = 'hidden';
 $('swipe-hint').style.visibility = 'hidden';
@@ -283,6 +285,8 @@ setTimeout(() => { btn.textContent = 'Reset'; btn.disabled = false; }, 1500);
 // the first async boundary.
 function openHello() {
   setBg('#f5efe6');
+  const hbd = $('hello-build-date');
+  if (hbd) hbd.textContent = 'build ' + (typeof BUILD_DATE === 'string' ? BUILD_DATE : '(unknown)');
   $('hello-overlay').classList.add('open');
   $('app').style.visibility = 'hidden';
   $('swipe-hint').style.visibility = 'hidden';
@@ -445,15 +449,15 @@ function showResume(reason) {
   if (!sessionUseVoice) return;
   _resumeReason = reason || 'unknown';
   ov.classList.add('open');
-  $('app').style.visibility = 'hidden';
 }
 
-// Resume tap — fresh user gesture frame. Kicks audio + mic synchronously
-// (iOS requires the gesture for getUserMedia). Reason-specific routing:
-// 'vc-failure' would normally wipe IDB and re-download (heaviest path),
-// but ear-tuner doesn't implement vcWipeAndRebuild yet — falls through
-// to vcKickOffLoad which still recovers from the worklet-zombie case via
-// cache reload.
+// Resume tap — fresh user gesture frame. Per Casey's report, the
+// "probe-and-conditional-nuke" approach was returning healthy probes
+// for contexts that were actually dead, leaving audio silent after
+// Resume even with unmuteMasterGain. Always nuke + rebuild the audio
+// context here — the user already paid the cost of tapping Resume, and
+// a fresh context is guaranteed not to be zombied. Matches the
+// pre-probe-and-rebuild behavior.
 function closeResume() {
   const reason = _resumeReason;
   _resumeReason = null;
@@ -466,6 +470,9 @@ function closeResume() {
     micStream = null;
   }
 
+  // Force a fresh AudioContext. nukeAudioCtx + ensureAudio inside the
+  // gesture frame so iOS accepts the new context's resume().
+  if (typeof nukeAudioCtx === 'function') nukeAudioCtx('resume-rebuild');
   const audioP = (typeof ensureAudio === 'function') ? ensureAudio() : Promise.resolve();
   const wantMic = !!sessionUseVoice;
   const micP   = (wantMic && (typeof micStream === 'undefined' || !micStream) &&
@@ -483,26 +490,25 @@ function closeResume() {
       console.warn('[resume] mic re-acquire failed — disabling VR for the rest of this session');
       sessionUseVoice = false;
     }
-    // _onMaybeBackgrounded muted master gain; the Resume branch returned
-    // before _onMaybeForegrounded got to its unmute call. Restore it now
-    // that audio is back, otherwise the app stays silent after Resume.
-    if (typeof unmuteMasterGain === 'function') unmuteMasterGain();
+    // Apply the user's volume setting to the fresh masterGain. Shared
+    // audio-ctx.js defaults to the microbreaker notifyVol scheme, which
+    // doesn't exist in ear-tuner; without this line, volume jumps to
+    // microbreaker's default after the rebuild.
+    if (typeof masterGain !== 'undefined' && masterGain && typeof audioCtx !== 'undefined' && audioCtx) {
+      try {
+        masterGain.gain.cancelScheduledValues(audioCtx.currentTime);
+        masterGain.gain.setValueAtTime(settings.volume, audioCtx.currentTime);
+      } catch (_) {}
+    }
     if (typeof wlAcquire === 'function') wlAcquire('resume');
-    // Three vc states are possible here:
-    //   'ready'     — vc survived: explicit vcStart needed (no auto-start).
-    //   'loading'   — vc was rebuilt by vcKickOffLoad: auto-start on
-    //                 loading→ready fires from vcOnStateChange.
-    //   'listening' — defensive; vcStart is a no-op there.
     if (sessionUseVoice && typeof vc !== 'undefined' && vc && vc.state === 'ready'
         && typeof vcStart === 'function') {
       vcStart().catch(e => console.warn('[resume] vcStart failed:', e));
     }
     $('resume-overlay').classList.remove('open');
-    $('app').style.visibility = '';
   }).catch(e => {
     console.warn('[resume] error:', e);
     $('resume-overlay').classList.remove('open');
-    $('app').style.visibility = '';
   });
 }
 

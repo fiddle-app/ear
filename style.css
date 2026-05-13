@@ -454,7 +454,7 @@ transition: color 0.15s;
 }
 #retest-close-btn:active { color: rgba(255,255,255,0.85); }
 
-#info-overlay, #welcome-overlay, #hello-overlay, #resume-overlay {
+#info-overlay, #welcome-overlay, #hello-overlay {
 background: var(--color-parchment);
 background-image: radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.10) 100%);
 color: #111; overflow-y: auto; -webkit-overflow-scrolling: touch;
@@ -600,14 +600,23 @@ body:has(#welcome-overlay.open) #settings-btn:active { color: rgba(0,0,0,0.75); 
 display: flex; flex-direction: column; gap: 18px; max-width: 600px; width: 100%;
 flex-grow: 1;
 }
-/* Hello / Resume overlays share the welcome overlay's padding and z layer. */
-#hello-overlay, #resume-overlay {
+/* Tiny build-date footer at the bottom of Welcome / Hello — debug aid
+   for verifying which build the home-screen-icon is actually running. */
+.launch-build-date {
+text-align: center;
+font-size: 11px;
+font-family: 'Inconsolata', monospace;
+color: rgba(0, 0, 0, 0.45);
+margin-top: 6px;
+}
+/* Hello overlay reuses the welcome-overlay padding + z-layer; Resume
+   modal has its own (dark, centered) style in resume-modal.css. */
+#hello-overlay {
 padding: calc(var(--safe-top) + 8px) 24px calc(var(--safe-bot) + 68px);
 align-items: center;
 z-index: 190;
 }
-/* Hello / Resume buttons reuse the Get Started shape. */
-#hello-yes-btn, #hello-no-btn, #resume-btn {
+#hello-yes-btn, #hello-no-btn {
 -webkit-appearance: none; font-family: var(--font);
 font-size: clamp(15px,4.5vw,19px); font-weight: 600; letter-spacing: 0.08em;
 background: var(--color-orange); color: #fff; border: none; border-radius: 999px;
@@ -615,7 +624,7 @@ padding: 14px 28px; cursor: pointer; align-self: center;
 transition: background 0.15s;
 }
 #hello-no-btn { background: rgba(0,0,0,0.18); color: rgba(0,0,0,0.75); }
-#hello-yes-btn:active, #resume-btn:active { background: var(--color-orange-dark); }
+#hello-yes-btn:active { background: var(--color-orange-dark); }
 #hello-no-btn:active { background: rgba(0,0,0,0.30); }
 /* Live VR transcript echo + loader. Anchored bottom-center, low z. */
 #vc-transcript {
