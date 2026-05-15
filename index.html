@@ -11,8 +11,8 @@
 <meta name="theme-color" id="meta-theme" content="#b83c08">
 <!-- Stamped by scripts/deploy.sh — used by the inline version-coherence
      check below to detect a hybrid-cache state at launch. Source ships
-     with 2026-05-15 14:15 as the literal placeholder. -->
-<meta name="ear-tuner-build" content="2026-05-15 14:15">
+     with 2026-05-15 15:10 as the literal placeholder. -->
+<meta name="ear-tuner-build" content="2026-05-15 15:10">
 <!-- PWA home-screen icon. MUST be a real PNG file reference — iOS Safari
      "Add to Home Screen" does not reliably accept data: URLs or JS-generated
      canvas icons. If you change this, test on iPad Safari: Share → Add to
@@ -232,6 +232,130 @@
   } catch (e) {}
 })();
 </script>
+<!-- Defense-in-depth upgrade detection + reusable modal-show.
+     The synchronous coherence check above only catches an upgrade once
+     the page has reloaded onto new HTML (meta would then differ from
+     last-seen). The intended trigger for that reload —
+     `controllerchange` after the new SW activates — can be silently
+     dropped on iOS Home-Screen PWAs when the page is suspended during
+     activation. The page then sits on stale HTML even though the SW's
+     static cache holds the new build.
+
+     This block compares the SW cache key directly against meta. When
+     they diverge it surfaces the standard upgrade modal — same OK-tap
+     cleanup-and-reload flow as the meta-vs-last-seen path, just driven
+     by a different signal. Runs at boot and on visibilitychange→visible
+     so a deploy that lands while the iPad is asleep is caught when the
+     user comes back. Idempotent — re-checks no-op if the modal is
+     already open or _etUpgrade is already set. -->
+<script>
+(function () {
+  // Skip on Capacitor — same rationale as the coherence check above.
+  if (window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function'
+      && window.Capacitor.isNativePlatform()) return;
+
+  // Reusable show. Idempotent. Defers if DOM isn't ready yet (cache
+  // check below can fire from <head> before the modal element exists).
+  window._etShowUpgradeModal = function (up) {
+    if (!up) return;
+    if (!document.body || !document.getElementById('upgrade-overlay')) {
+      document.addEventListener('DOMContentLoaded', function () {
+        window._etShowUpgradeModal(up);
+      }, { once: true });
+      return;
+    }
+    var ov  = document.getElementById('upgrade-overlay');
+    var btn = document.getElementById('upgrade-ok');
+    if (!ov || !btn) return;
+    if (ov.classList.contains('open')) return;
+    var ver = document.getElementById('upgrade-version');
+    if (ver) ver.textContent = up.to;
+    ov.classList.add('open');
+    // Disable OK for 1500ms so a ghost tap from launching the icon (a
+    // finger still hovering when the modal renders) cannot immediately
+    // dismiss it. Visible state: dimmed.
+    btn.disabled = true;
+    setTimeout(function () { btn.disabled = false; }, 1500);
+    btn.addEventListener('click', function () {
+      btn.disabled = true;
+      btn.textContent = 'Updating…';
+      // Persist the new build IMMEDIATELY — before any async cleanup
+      // that could hang. iOS PWA has been observed to hang on
+      // serviceWorker.unregister() / caches.delete() indefinitely;
+      // without this early write, a hang on the wipe leaves
+      // et-last-build stale and the modal re-fires on next launch.
+      try { localStorage.setItem('et-last-build', up.to); } catch (e) {}
+      // Tell the next page-load's controllerchange listener to ignore
+      // its first event — the post-reload re-register fires CC
+      // immediately as the fresh SW claims the page. Without the skip,
+      // that triggers another reload that loops the user back through
+      // Hello.
+      try { sessionStorage.setItem('et-skip-next-cc', '1'); } catch (e) {}
+      var doReload = function () { window.location.replace(window.location.pathname); };
+      var cleanup = Promise.resolve();
+      if ('serviceWorker' in navigator) {
+        cleanup = cleanup.then(function () {
+          return navigator.serviceWorker.getRegistrations().then(function (regs) {
+            return Promise.all(regs.map(function (r) { return r.unregister(); }));
+          });
+        }).catch(function () {});
+      }
+      if (window.caches) {
+        cleanup = cleanup.then(function () {
+          return caches.keys().then(function (keys) {
+            return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+          });
+        }).catch(function () {});
+      }
+      var timeout = new Promise(function (resolve) { setTimeout(resolve, 3000); });
+      Promise.race([cleanup, timeout]).then(doReload, doReload);
+    });
+  };
+
+  function cacheCheck() {
+    if (!window.caches) return;
+    if (window._etUpgrade) return;  // already detected by coherence check
+    var meta = document.querySelector('meta[name="ear-tuner-build"]');
+    var metaVer = meta && meta.content;
+    var PH = '%' + '%BUILD_DATE%' + '%';
+    if (!metaVer || metaVer === PH) return;
+    caches.keys().then(function (keys) {
+      // During SW activate the GC pass can briefly leave two
+      // ear-tuner-static-* caches present. Take the lexicographic max
+      // (BUILD_DATE 'YYYY-MM-DD HH:mm' sorts correctly as a string) so
+      // we always compare against the newest cache, not whichever the
+      // implementation happens to enumerate first.
+      var newestVer = null;
+      for (var i = 0; i < keys.length; i++) {
+        if (keys[i].indexOf('ear-tuner-static-') !== 0) continue;
+        var v = keys[i].replace('ear-tuner-static-', '');
+        if (newestVer === null || v > newestVer) newestVer = v;
+      }
+      if (newestVer === null) return;
+      // Only fire on a forward upgrade. If cacheVer < metaVer (user
+      // cleared caches manually, or some other regression scenario),
+      // showing the modal would write the OLDER build to et-last-build
+      // on OK-tap and re-fire on every subsequent boot.
+      if (newestVer <= metaVer) return;
+      if (window._etUpgrade) return;  // race: coherence path got there first
+      window._etUpgrade = { from: metaVer, to: newestVer };
+      try {
+        localStorage.setItem('et-boot-decision', JSON.stringify({
+          ts: Date.now(), last: metaVer, current: newestVer,
+          action: 'cache-mismatch'
+        }));
+      } catch (e) {}
+      if (window._etShowUpgradeModal) {
+        window._etShowUpgradeModal(window._etUpgrade);
+      }
+    }).catch(function () {});
+  }
+  cacheCheck();
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') cacheCheck();
+  });
+})();
+</script>
 <!-- Self-contained styles for the upgrade modal. Deliberately NOT using
      design-tokens.css / style.css — those live in separate cached files
      that may themselves be from a stale version when the upgrade modal
@@ -304,61 +428,12 @@
   <button id="upgrade-ok" type="button">OK</button>
 </div>
 <script>
-(function () {
-  var up = window._etUpgrade;
-  if (!up) return;
-  var ov  = document.getElementById('upgrade-overlay');
-  var ver = document.getElementById('upgrade-version');
-  var btn = document.getElementById('upgrade-ok');
-  if (!ov || !btn) return;
-  if (ver) ver.textContent = up.to;
-  ov.classList.add('open');
-  // Disable OK for 1500ms so ghost taps from launching the app icon
-  // (a finger still hovering when the modal renders) cannot immediately
-  // dismiss it. Visible state: dimmed.
-  btn.disabled = true;
-  setTimeout(function () { btn.disabled = false; }, 1500);
-  btn.addEventListener('click', function () {
-    btn.disabled = true;
-    btn.textContent = 'Updating…';
-    // Persist the new build IMMEDIATELY — before any async cleanup that
-    // could hang. iOS PWA has been observed to hang on
-    // serviceWorker.unregister() / caches.delete() indefinitely; without
-    // this early write, a hang on the wipe leaves et-last-build stale
-    // and the modal re-fires on the next launch. The cleanup itself is
-    // defense-in-depth; the SW will serve fresh content on reload
-    // regardless.
-    try { localStorage.setItem('et-last-build', up.to); } catch (e) {}
-    // Tell the next page-load's controllerchange listener to ignore the
-    // first event — boot.js re-registers the SW from scratch after our
-    // unregister, and the fresh SW fires controllerchange immediately
-    // for content we're already on. Without the skip, that triggers
-    // another reload that loops the user back through Hello. The flag
-    // is read AND consumed at the top of the listener script on next
-    // load.
-    try { sessionStorage.setItem('et-skip-next-cc', '1'); } catch (e) {}
-    var doReload = function () { window.location.replace(window.location.pathname); };
-    // Cleanup chain, raced against a 3s timeout. Whichever completes
-    // first triggers the reload.
-    var cleanup = Promise.resolve();
-    if ('serviceWorker' in navigator) {
-      cleanup = cleanup.then(function () {
-        return navigator.serviceWorker.getRegistrations().then(function (regs) {
-          return Promise.all(regs.map(function (r) { return r.unregister(); }));
-        });
-      }).catch(function () {});
-    }
-    if (window.caches) {
-      cleanup = cleanup.then(function () {
-        return caches.keys().then(function (keys) {
-          return Promise.all(keys.map(function (k) { return caches.delete(k); }));
-        });
-      }).catch(function () {});
-    }
-    var timeout = new Promise(function (resolve) { setTimeout(resolve, 3000); });
-    Promise.race([cleanup, timeout]).then(doReload, doReload);
-  });
-})();
+// Show the modal if the synchronous coherence check in <head> already
+// detected an upgrade. The async cache-key path defined in <head> calls
+// _etShowUpgradeModal directly when it detects, so this body call only
+// matters for the meta-vs-last-seen path. _etShowUpgradeModal is
+// undefined on Capacitor (the IIFE early-returns there) — guard for it.
+if (window._etShowUpgradeModal) window._etShowUpgradeModal(window._etUpgrade);
 </script>
 
 <!-- SPRITE-INLINE -->
@@ -451,7 +526,6 @@
       <button class="round-action-btn" id="continue-action-btn" onclick="continueAfterFail()">Continue</button>
       <button class="round-action-btn" id="back-action-btn" onclick="continueAfterFail()" style="display:none;">Back</button>
     </div>
-    <button id="exit-retest-btn" onclick="exitRetest()">Exit re-test</button>
   </div>
 </div>
 

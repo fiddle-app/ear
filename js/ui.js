@@ -801,14 +801,12 @@ if (retestNote) {
   $('app').classList.add('retest-mode');
   setBg('#0d2a1a');
   // Explicit display value (not '') because CSS default is `display: none` —
-  // setting style.display = '' would fall back to that and keep them hidden.
-  $('exit-retest-btn').style.display = 'block';
+  // setting style.display = '' would fall back to that and keep it hidden.
   $('retest-close-btn').style.display = 'block';
 } else {
   $('phase-label').textContent = 'Listen';
   $('app').classList.remove('retest-mode');
   setBg('#4d1903');
-  $('exit-retest-btn').style.display = 'none';
   $('retest-close-btn').style.display = 'none';
 }
 }
