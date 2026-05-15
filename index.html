@@ -11,8 +11,8 @@
 <meta name="theme-color" id="meta-theme" content="#b83c08">
 <!-- Stamped by scripts/deploy.sh — used by the inline version-coherence
      check below to detect a hybrid-cache state at launch. Source ships
-     with 2026-05-13 13:55 as the literal placeholder. -->
-<meta name="ear-tuner-build" content="2026-05-13 13:55">
+     with 2026-05-15 14:03 as the literal placeholder. -->
+<meta name="ear-tuner-build" content="2026-05-15 14:03">
 <!-- PWA home-screen icon. MUST be a real PNG file reference — iOS Safari
      "Add to Home Screen" does not reliably accept data: URLs or JS-generated
      canvas icons. If you change this, test on iPad Safari: Share → Add to
@@ -177,6 +177,33 @@
      suppress the modal on every clean deploy. -->
 <script>
 (function () {
+  // Skip the upgrade-comparison flow entirely on Capacitor. The
+  // mechanism (SW unregister + caches.delete) is a no-op there — no
+  // SW runs in the Cap webview, no Cache Storage to clean. Every
+  // `cap sync` also bumps BUILD_DATE, so a mismatch fires on every
+  // rebuild and the modal becomes pure dev-time friction. We still
+  // record et-last-build so that a hypothetical Cap→PWA migration
+  // wouldn't see a phantom upgrade on the first PWA launch.
+  // Detection inlined (window.Capacitor injected before any page
+  // script) since this runs before js/platform.js loads.
+  var isCap = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function'
+                 && window.Capacitor.isNativePlatform());
+  if (isCap) {
+    window._etUpgrade = null;
+    try {
+      var capMeta    = document.querySelector('meta[name="ear-tuner-build"]');
+      var capCurrent = (capMeta && capMeta.content) || null;
+      var capPh      = '%' + '%BUILD_DATE%' + '%';
+      if (capCurrent && capCurrent !== capPh) {
+        localStorage.setItem('et-last-build', capCurrent);
+      }
+      localStorage.setItem('et-boot-decision', JSON.stringify({
+        action: 'cap-skipped', ts: Date.now()
+      }));
+    } catch (e) {}
+    return;
+  }
+
   var meta    = document.querySelector('meta[name="ear-tuner-build"]');
   var current = (meta && meta.content) || null;
   var PLACEHOLDER = '%' + '%BUILD_DATE%' + '%';
@@ -434,7 +461,7 @@
 
 <!-- Retest close button: shown top-right during retest mode -->
 
-<button id="retest-close-btn" onclick="exitRetest(true); setTimeout(startRound,100);" aria-label="Exit retest">
+<button id="retest-close-btn" onclick="closeRetest()" aria-label="Close retest">
   <svg width="34" height="34" aria-hidden="true"><use href="#icon-close-x"/></svg>
 </button>
 
@@ -804,6 +831,7 @@
 
 
 <script src="soundfont-player.min.js"></script>
+<script src="js/platform.js"></script>
 <script src="js/constants.js"></script>
 <script src="js/persistence.js"></script>
 <!-- Diag-log prefix MUST be set before diag-log.js loads — keys all
@@ -826,6 +854,7 @@
      iPhone PWA before the welcome overlay rendered. -->
 <script src="js/voice-commands.js"></script>
 <script src="js/voice.js"></script>
+<script src="js/register-sw.js"></script>
 <script src="js/boot.js"></script>
 </body>
 </html>

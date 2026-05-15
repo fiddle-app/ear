@@ -53,9 +53,9 @@ function confirmResetDefaults() {
 $('reset-overlay').classList.remove('open');
 settings = {
   lowestNote:22, highestNote:53,
-  startCentsIdx:5, noteDurIdx:3, attack:1, decay:1, soundIdx:2, testsPerRound:3,
+  startCentsIdx:2, noteDurIdx:3, attack:1, decay:1, soundIdx:2, testsPerRound:3,
   volume:1.0,
-  voiceCommands: false, limitVrVocab: true, vcKeepLastWord: false,
+  voiceCommands: true, limitVrVocab: true, vcKeepLastWord: false,
 };
 saveSettings();
 centsIdx = settings.startCentsIdx;
@@ -399,7 +399,12 @@ async function _onMaybeForegrounded() {
     if (!audioOk && typeof nukeAudioCtx === 'function') {
       nukeAudioCtx('regain-unhealthy');
     }
-    showResume(audioOk ? 'mic-stale' : 'audio-and-mic');
+    const reasonA = audioOk ? 'mic-stale' : 'audio-and-mic';
+    if (typeof isNative === 'function' && isNative()) {
+      _performResumeRebuild(reasonA);
+    } else {
+      showResume(reasonA);
+    }
     return;
   }
 
@@ -413,7 +418,11 @@ async function _onMaybeForegrounded() {
       : true;
     if (!audioOk2) {
       console.log('[gate] silent audio rebuild failed — escalating to Resume');
-      showResume('audio-unhealthy');
+      if (typeof isNative === 'function' && isNative()) {
+        _performResumeRebuild('audio-unhealthy');
+      } else {
+        showResume('audio-unhealthy');
+      }
       return;
     }
   }
@@ -445,7 +454,11 @@ async function _onMaybeForegrounded() {
       : true;
     if (!audioOk3) {
       console.log('[gate] silent vc rebuild — fresh audioCtx still unhealthy, escalating to Resume');
-      showResume('vc-failure');
+      if (typeof isNative === 'function' && isNative()) {
+        _performResumeRebuild('vc-failure');
+      } else {
+        showResume('vc-failure');
+      }
       return;
     }
     if (typeof vcKickOffLoad === 'function') vcKickOffLoad();
@@ -469,11 +482,25 @@ function showResume(reason) {
 // a fresh context is guaranteed not to be zombied. Matches the
 // pre-probe-and-rebuild behavior.
 function closeResume() {
+  $('resume-overlay').classList.remove('open');
   const reason = _resumeReason;
   _resumeReason = null;
+  _performResumeRebuild(reason);
+}
 
-  // Pre-flight: drop a dead micStream so acquireMic fires inside this
-  // gesture frame. Live stream is reused to avoid iOS's mic-toggle ping.
+// Body of the rebuild work, callable WITHOUT showing the overlay.
+// On PWA, only closeResume() invokes this (after the user taps the
+// Resume button, which provides the gesture frame iOS requires for
+// getUserMedia). On Cap, _onMaybeForegrounded invokes it directly,
+// bypassing the modal — native permission grant means getUserMedia
+// outside a gesture is permitted.
+function _performResumeRebuild(reason) {
+  // Pre-flight: drop a dead micStream so acquireMic fires fresh. On
+  // PWA the call site is the Resume button, which provides the gesture
+  // frame Safari requires for getUserMedia. On Cap the call site is
+  // _onMaybeForegrounded — no gesture, but native permission grant
+  // makes getUserMedia outside a gesture permitted there. Live stream
+  // is reused to avoid iOS's mic-toggle ping.
   if (typeof micStream !== 'undefined' && micStream &&
       typeof micStreamIsLive === 'function' && !micStreamIsLive()) {
     try { micStream.getTracks().forEach(t => t.stop()); } catch (_) {}
@@ -505,10 +532,8 @@ function closeResume() {
         && typeof vcStart === 'function') {
       vcStart().catch(e => console.warn('[resume] vcStart failed:', e));
     }
-    $('resume-overlay').classList.remove('open');
   }).catch(e => {
     console.warn('[resume] error:', e);
-    $('resume-overlay').classList.remove('open');
   });
 }
 
@@ -755,6 +780,20 @@ if (!silent) startRound();
 
 function startNoteTest(n) { startRetest(n); }
 function endNoteTest()    { exitRetest(); }
+
+// Exit retest and return to the Info screen — used by the top-right X
+// button and the "close" voice command. Mirrors the post-retest-end
+// flow in continueAfterFail() so both routes land in the same place.
+function closeRetest() {
+  exitRetest(true);
+  setTimeout(() => {
+    openInfo();
+    setTimeout(() => {
+      const scoresEl = document.getElementById('stats-table');
+      if (scoresEl) scoresEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 150);
+  }, 200);
+}
 
 function updateRetestUI() {
 if (retestNote) {

@@ -133,36 +133,11 @@ if (s.type === 'sf') {
 // the icon is resources/app-icon.svg; regenerate the PNG via the svg-to-png
 // skill. See research/pwa-home-screen-icon-plan.md.
 
-if ('serviceWorker' in navigator) {
-  // In dev, the cache key in sw.js is `ear-tuner-static-%%BUILD_DATE%%`
-  // — the placeholder is only stamped at deploy time, so the cache name
-  // is stable across dev sessions and an old SW will happily serve
-  // stale CSS/JS forever. Auto-unregister any existing SW when running
-  // on localhost; only register a real SW in prod.
-  const isDev = location.hostname === 'localhost' ||
-                location.hostname === '127.0.0.1';
-  if (isDev) {
-    navigator.serviceWorker.getRegistrations()
-      .then(regs => regs.forEach(r => r.unregister()));
-  } else {
-    // Register SW + push any new install through to activation.
-    // The `controllerchange → reload` flow lives in the inline <head>
-    // script (with safe-phase deferral). Attaching it there avoids the
-    // race where a second listener inside register().then() would miss
-    // the event if controllerchange fires before register resolves.
-    navigator.serviceWorker.register('sw.js').then(reg => {
-      reg.update().catch(() => {});
-      reg.addEventListener('updatefound', () => {
-        console.log('[sw] updatefound visible=' + (document.visibilityState === 'visible'));
-        const newSW = reg.installing;
-        if (!newSW) return;
-        newSW.addEventListener('statechange', () => {
-          console.log('[sw] new-worker statechange state=' + newSW.state);
-          if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
-            newSW.postMessage({ type: 'SKIP_WAITING' });
-          }
-        });
-      });
-    });
-  }
-}
+// SW registration delegated to _shared/js/register-sw.js — Capacitor-aware
+// (skips under capacitor:// scheme), localhost-aware (unregisters any
+// leftover SW in dev), and consistent across the family. The
+// controllerchange→reload flow lives in the inline <head> script in
+// index.html (with safe-phase deferral) — keep it there to avoid a race
+// where a listener attached inside register().then() misses an early
+// controllerchange.
+registerSW();
