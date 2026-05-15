@@ -800,8 +800,10 @@ if (retestNote) {
   $('phase-label').textContent = 'Re-testing ' + dn(retestNote);
   $('app').classList.add('retest-mode');
   setBg('#0d2a1a');
-  $('exit-retest-btn').style.display = '';
-  $('retest-close-btn').style.display = '';
+  // Explicit display value (not '') because CSS default is `display: none` —
+  // setting style.display = '' would fall back to that and keep them hidden.
+  $('exit-retest-btn').style.display = 'block';
+  $('retest-close-btn').style.display = 'block';
 } else {
   $('phase-label').textContent = 'Listen';
   $('app').classList.remove('retest-mode');
