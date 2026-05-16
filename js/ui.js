@@ -630,18 +630,17 @@ if (allWithBest.length > 0) {
 }
 
 if (!sorted.length) {
-  tbody.innerHTML='<tr><td colspan="4" style="opacity:.45;font-style:italic;padding:10px 8px">No data yet</td></tr>';
+  tbody.innerHTML='<tr><td colspan="3" style="opacity:.45;font-style:italic;padding:10px 8px">No data yet</td></tr>';
 } else {
   sorted.forEach(note=>{
     const st=stats[note.name];
     const best    = (st?.bestCents!=null)       ? fmtC(st.bestCents)        : '—';
-    const failed  = (st?.lastFailureCents!=null) ? fmtC(st.lastFailureCents) : '—';
     const regressed = isRegressed(note.name);
     const noBest = st?.lastFailureCents != null && st?.bestCents == null;
     const tr=document.createElement('tr');
     if (regressed) tr.classList.add('stat-row-regressed');
     else if (noBest) tr.classList.add('stat-row-no-best');
-    tr.innerHTML=`<td class="stat-note-name">${dn(note.name)}</td> <td class="stat-best">${best}</td> <td class="stat-failed">${failed}</td> <td><button class="stat-btn stat-retest-btn" onclick="startNoteTest('${note.name}')">Retest</button></td>`;
+    tr.innerHTML=`<td class="stat-note-name">${dn(note.name)}</td> <td class="stat-best">${best}</td> <td><button class="stat-btn stat-retest-btn" onclick="startNoteTest('${note.name}')">Retest</button></td>`;
     tbody.appendChild(tr);
   });
 }
