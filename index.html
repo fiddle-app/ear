@@ -11,8 +11,8 @@
 <meta name="theme-color" id="meta-theme" content="#b83c08">
 <!-- Stamped by scripts/deploy.sh — used by the inline version-coherence
      check below to detect a hybrid-cache state at launch. Source ships
-     with 2026-05-16 13:01 as the literal placeholder. -->
-<meta name="ear-tuner-build" content="2026-05-16 13:01">
+     with 2026-05-16 14:32 as the literal placeholder. -->
+<meta name="ear-tuner-build" content="2026-05-16 14:32">
 <!-- PWA home-screen icon. MUST be a real PNG file reference — iOS Safari
      "Add to Home Screen" does not reliably accept data: URLs or JS-generated
      canvas icons. If you change this, test on iPad Safari: Share → Add to
@@ -650,20 +650,6 @@ if (window._etShowUpgradeModal) window._etShowUpgradeModal(window._etUpgrade);
           <div class="tog-thumb"></div>
         </label>
       </div>
-      <div class="s-row" id="s-vc-status-row" style="display:none;">
-        <div><div class="s-label">Voice Model</div><div class="s-sub" id="s-vc-status">Idle</div></div>
-      </div>
-      <div class="tog-row" id="s-limit-vr-row" style="display:none;">
-        <div>
-          <div class="s-label">Limit VR Vocabulary</div>
-          <div class="s-sub">Strict grammar — recognizer rejects words outside the command set</div>
-        </div>
-        <label class="tog-sw">
-          <input type="checkbox" id="s-limit-vr" onchange="onLimitVrToggle(this.checked)">
-          <div class="tog-track"></div>
-          <div class="tog-thumb"></div>
-        </label>
-      </div>
       <div class="tog-row" id="s-vc-keep-row" style="display:none;">
         <div>
           <div class="s-label">Keep last word on-screen</div>
@@ -676,43 +662,73 @@ if (window._etShowUpgradeModal) window._etShowUpgradeModal(window._etUpgrade);
         </label>
       </div>
 
-      <div class="s-sec">Diagnostics</div>
-      <div class="s-row">
-        <div><div class="s-label">Debug Log</div><div class="s-sub">Captures lifecycle events for crash diagnosis</div></div>
-        <div style="display:flex;gap:8px;">
-          <button id="s-copy-log-btn" class="log-action-btn" onclick="copyLog()">Copy</button>
-          <button class="log-action-btn" onclick="clearLog()">Clear</button>
+      <!-- Diagnostics section is hidden by default. Revealed by 7 taps in
+           the bottom tap zone (#s-debug-tap-zone). Persisted via the
+           'et-debug-revealed' localStorage key. -->
+      <div id="diagnostics-section" style="display:none;">
+        <div class="s-sec">Diagnostics</div>
+        <div class="s-row" id="s-vc-status-row" style="display:none;">
+          <div><div class="s-label">Voice Model</div><div class="s-sub" id="s-vc-status">Idle</div></div>
+        </div>
+        <div class="tog-row" id="s-limit-vr-row" style="display:none;">
+          <div>
+            <div class="s-label">Limit VR Vocabulary</div>
+            <div class="s-sub">Strict grammar — recognizer rejects words outside the command set</div>
+          </div>
+          <label class="tog-sw">
+            <input type="checkbox" id="s-limit-vr" onchange="onLimitVrToggle(this.checked)">
+            <div class="tog-track"></div>
+            <div class="tog-thumb"></div>
+          </label>
+        </div>
+        <div class="s-row">
+          <div><div class="s-label">Debug Log</div><div class="s-sub">Captures lifecycle events for crash diagnosis</div></div>
+          <div style="display:flex;gap:8px;">
+            <button id="s-copy-log-btn" class="log-action-btn" onclick="copyLog()">Copy</button>
+            <button class="log-action-btn" onclick="clearLog()">Clear</button>
+          </div>
+        </div>
+
+        <div class="s-row">
+          <div><div class="s-label">Welcome Screen</div><div class="s-sub">Reset to show on next launch</div></div>
+          <button id="welcome-reset-btn" class="log-action-btn" onclick="resetWelcome()">Reset</button>
+        </div>
+
+        <div class="s-row">
+          <div>
+            <div class="s-label">App Version</div>
+            <div class="s-sub" id="s-build-date"></div>
+            <div class="s-sub" id="s-sw-status" style="margin-top:1px; white-space: pre-line;"></div>
+          </div>
+          <button class="log-action-btn" onclick="reloadFromServer()">Reload</button>
+        </div>
+
+        <div class="s-row">
+          <div style="flex:1;"><div class="s-label">Memory</div><div class="s-sub" id="s-mem-status">—</div></div>
+          <button id="s-mem-refresh" class="log-action-btn">Refresh</button>
+        </div>
+
+        <div class="s-row">
+          <div><div class="s-label">Randomize Scores</div><div class="s-sub">Fill stats with fake history for testing</div></div>
+          <button class="log-action-btn" onclick="confirmRandomizeScores()">Randomize</button>
+        </div>
+
+        <div class="s-row" style="flex-direction:column; align-items:stretch; gap:6px; padding: 8px 0;">
+          <div class="s-label">Hard reset</div>
+          <div class="s-sub" style="line-height: 1.5;">
+            Wipes ALL local data — settings, log, voice cache, service worker. Requires internet on next launch. Use only if Reload doesn't help (fonts broken, version blank, app behaving strangely).
+          </div>
+          <button id="s-hard-reset-btn" class="log-action-btn" style="background: rgba(220,80,80,0.18); color: rgba(255,200,200,0.95);">Hard reset</button>
         </div>
       </div>
 
-      <div class="s-row">
-        <div><div class="s-label">Welcome Screen</div><div class="s-sub">Reset to show on next launch</div></div>
-        <button id="welcome-reset-btn" class="log-action-btn" onclick="resetWelcome()">Reset</button>
+      <!-- Bottom tap zone for the secret 7-tap debug-reveal. Wraps the
+           Reset button and the always-visible build-date footer; the
+           click counter listens on this whole region. -->
+      <div id="s-debug-tap-zone">
+        <button id="s-reset-btn" onclick="openResetDefaults()">Reset to defaults…</button>
+        <div class="s-build-date-footer" id="settings-build-date"></div>
       </div>
-
-      <div class="s-row">
-        <div>
-          <div class="s-label">App Version</div>
-          <div class="s-sub" id="s-build-date"></div>
-          <div class="s-sub" id="s-sw-status" style="margin-top:1px; white-space: pre-line;"></div>
-        </div>
-        <button class="log-action-btn" onclick="reloadFromServer()">Reload</button>
-      </div>
-
-      <div class="s-row">
-        <div style="flex:1;"><div class="s-label">Memory</div><div class="s-sub" id="s-mem-status">—</div></div>
-        <button id="s-mem-refresh" class="log-action-btn">Refresh</button>
-      </div>
-
-      <div class="s-row" style="flex-direction:column; align-items:stretch; gap:6px; padding: 8px 0;">
-        <div class="s-label">Hard reset</div>
-        <div class="s-sub" style="line-height: 1.5;">
-          Wipes ALL local data — settings, log, voice cache, service worker. Requires internet on next launch. Use only if Reload doesn't help (fonts broken, version blank, app behaving strangely).
-        </div>
-        <button id="s-hard-reset-btn" class="log-action-btn" style="background: rgba(220,80,80,0.18); color: rgba(255,200,200,0.95);">Hard reset</button>
-      </div>
-
-      <button id="s-reset-btn" onclick="openResetDefaults()">Reset to defaults…</button>
       <div style="height:28px"></div>
     </div>
   </div>
@@ -852,6 +868,7 @@ if (window._etShowUpgradeModal) window._etShowUpgradeModal(window._etUpgrade);
       Highlighted bars/rows &mdash; last test failed at a difference at which you once succeeded.
     </p>
     <div id="info-copy-row">
+      <button id="info-import-scores" onclick="openImportScores()">Import Scores</button>
       <button id="info-copy-scores-btn" onclick="copyScores()">Copy Scores</button>
       <span id="info-copy-label">Paste into an email to share with a friend.</span>
     </div>
@@ -859,8 +876,6 @@ if (window._etShowUpgradeModal) window._etShowUpgradeModal(window._etUpgrade);
 
     <div id="info-destructive-row">
       <button id="info-global-reset" onclick="confirmResetAll()">Reset All Scores</button>
-      <button id="info-fake-history" onclick="confirmRandomizeScores()">Randomize Scores</button>
-      <button id="info-import-scores" onclick="openImportScores()">Import Scores</button>
     </div>
 
     <p style="font-family:var(--font-info);font-size:var(--font-info-subheading);color:rgba(0,0,0,0.40);line-height:1.6;margin-top:4px;">

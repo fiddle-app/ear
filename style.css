@@ -367,6 +367,23 @@ display: flex; align-items: center; justify-content: center;
 .tog-sw input:checked ~ .tog-thumb { transform: translateX(22px); }
 #s-reset-btn { background: none; border: none; color: rgba(255,255,255,0.35); font-family: var(--font); font-size: clamp(14px, 3.8vw, 17px); letter-spacing: 0.04em; cursor: pointer; margin-top: 28px; padding: 6px 0; text-decoration: underline; text-underline-offset: 3px; -webkit-appearance: none; align-self: center; }
 #s-reset-btn:active { color: rgba(255,255,255,0.65); }
+/* Secret 7-tap reveal zone for the diagnostics section. Wraps the
+   Reset button and the bottom build-date footer; tap counter listens
+   here in js/ui.js. The zone needs enough vertical area for fingers
+   to find. */
+#s-debug-tap-zone {
+display: flex; flex-direction: column; align-items: center;
+padding: 4px 0 14px;
+}
+/* Dark-bg variant of .launch-build-date (settings overlay is dark). */
+.s-build-date-footer {
+text-align: center;
+font-size: 11px;
+font-family: 'Inconsolata', monospace;
+color: rgba(255, 255, 255, 0.25);
+letter-spacing: 0.04em;
+margin-top: 16px;
+}
 #reset-overlay { display: none; position: fixed; inset: 0; z-index: 400; background: rgba(0,0,0,0.75); align-items: center; justify-content: center; }
 #reset-overlay.open { display: flex; }
 #reset-box { background: #2a2a2a; border-radius: 16px; padding: 28px 24px; max-width: 320px; width: 90%; font-family: var(--font); color: #fff; /* slightly lighter than --color-bg-panel, intentional */ }
@@ -506,13 +523,17 @@ position: relative;
 #info-copy-row {
 display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
 }
-#info-copy-scores-btn {
+/* Copy + Import share the orange "share" styling. Transparent border so
+   the box-model height matches the bordered Reset All Scores button. */
+#info-copy-scores-btn,
+#info-import-scores {
 -webkit-appearance: none; font-family: var(--font); font-size: clamp(13px, 3.5vw, 15px);
 padding: 10px 22px; border-radius: 999px; cursor: pointer;
-border: none; background: var(--color-orange-2); color: #fff;
+border: 1.5px solid transparent; background: var(--color-orange-2); color: #fff;
 flex-shrink: 0; transition: background 0.15s, opacity 0.15s;
 }
-#info-copy-scores-btn:active { background: #5a1e00; }
+#info-copy-scores-btn:active,
+#info-import-scores:active { background: #5a1e00; }
 #info-copy-label {
 font-family: var(--font-info); font-size: var(--font-info-body); color: rgba(0,0,0,0.45); line-height: 1.4;
 }
@@ -529,20 +550,6 @@ border: 1.5px solid rgba(0,0,0,0.15); background: rgba(0,0,0,0.06); color: rgba(
 transition: background 0.15s;
 }
 #info-global-reset:active { background: rgba(0,0,0,0.12); }
-#info-fake-history {
--webkit-appearance: none; font-family: var(--font); font-size: clamp(13px, 3.5vw, 15px);
-padding: 10px 22px; border-radius: 999px; cursor: pointer;
-border: 1.5px solid rgba(0,0,0,0.15); background: rgba(0,0,0,0.06); color: rgba(0,0,0,0.45);
-transition: background 0.15s;
-}
-#info-fake-history:active { background: rgba(0,0,0,0.12); }
-#info-import-scores {
--webkit-appearance: none; font-family: var(--font); font-size: clamp(13px, 3.5vw, 15px);
-padding: 10px 22px; border-radius: 999px; cursor: pointer;
-border: 1.5px solid rgba(0,0,0,0.15); background: rgba(0,0,0,0.06); color: rgba(0,0,0,0.45);
-transition: background 0.15s;
-}
-#info-import-scores:active { background: rgba(0,0,0,0.12); }
 
 /* Import Scores overlay */
 #import-overlay {

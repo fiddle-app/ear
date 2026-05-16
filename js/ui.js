@@ -210,6 +210,9 @@ if (s.type==='sf'&&!sfInstruments[s.sfName]) loadSfInstrument(s.sfName).then(()=
 renderSettings();
 renderSwStatus();
 renderMemStatus();
+applyDebugReveal();
+const sbd = $('settings-build-date');
+if (sbd) sbd.textContent = 'build ' + BUILD_DATE;
 setBg('#1a1a1a');
 $('settings-overlay').classList.add('open');
 $('info-btn').style.visibility = 'hidden';
@@ -1186,6 +1189,45 @@ async function hardReset() {
 if ($('s-hard-reset-btn')) {
   $('s-hard-reset-btn').addEventListener('click', hardReset);
 }
+
+// Debug reveal — 7 taps within the #s-debug-tap-zone (Reset button +
+// build-date footer area) toggles the Diagnostics section's visibility.
+// Persisted in 'et-debug-revealed' so it survives reloads.
+function applyDebugReveal() {
+  const revealed = localStorage.getItem('et-debug-revealed') === '1';
+  const sec = document.getElementById('diagnostics-section');
+  if (sec) sec.style.display = revealed ? '' : 'none';
+}
+
+function toggleDebugReveal() {
+  const revealed = localStorage.getItem('et-debug-revealed') === '1';
+  if (revealed) localStorage.removeItem('et-debug-revealed');
+  else          localStorage.setItem('et-debug-revealed', '1');
+  applyDebugReveal();
+}
+
+(function () {
+  const zone = document.getElementById('s-debug-tap-zone');
+  if (!zone) return;
+  let taps = 0;
+  let lastTapAt = 0;
+  const REQUIRED = 7;
+  // Consecutive taps must land within 3s of each other. Tapping the
+  // Reset-to-defaults button opens the reset overlay which covers the
+  // zone — dismissing takes longer than the window, so Reset taps
+  // effectively don't accumulate. Empty-area / build-date taps do.
+  const WINDOW_MS = 3000;
+  zone.addEventListener('click', () => {
+    const now = Date.now();
+    if (now - lastTapAt > WINDOW_MS) taps = 0;
+    lastTapAt = now;
+    taps++;
+    if (taps >= REQUIRED) {
+      taps = 0;
+      toggleDebugReveal();
+    }
+  });
+})();
 
 // Bulletproof "I want the latest" — unregister all SWs and delete every
 // cache so the reload hits raw network. Critical safety check: probe the
