@@ -11,8 +11,8 @@
 <meta name="theme-color" id="meta-theme" content="#b83c08">
 <!-- Stamped by scripts/deploy.sh — used by the inline version-coherence
      check below to detect a hybrid-cache state at launch. Source ships
-     with 2026-05-16 12:47 as the literal placeholder. -->
-<meta name="ear-tuner-build" content="2026-05-16 12:47">
+     with 2026-05-16 12:53 as the literal placeholder. -->
+<meta name="ear-tuner-build" content="2026-05-16 12:53">
 <!-- PWA home-screen icon. MUST be a real PNG file reference — iOS Safari
      "Add to Home Screen" does not reliably accept data: URLs or JS-generated
      canvas icons. If you change this, test on iPad Safari: Share → Add to
@@ -848,6 +848,9 @@ if (window._etShowUpgradeModal) window._etShowUpgradeModal(window._etUpgrade);
       <thead><tr><th>Note</th><th>Best</th><th>Failed</th><th></th></tr></thead>
       <tbody id="stats-tbody"></tbody>
     </table>
+    <p class="info-p" style="font-size:0.85em;opacity:0.65;font-style:italic;margin-top:-4px;">
+      Highlighted bars/rows &mdash; last test failed at a difference at which you once succeeded.
+    </p>
     <div id="info-copy-row">
       <button id="info-copy-scores-btn" onclick="copyScores()">Copy Scores</button>
       <span id="info-copy-label">Paste into an email to share with a friend.</span>
