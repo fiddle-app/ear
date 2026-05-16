@@ -252,6 +252,9 @@ if (roundResults.length===settings.testsPerRound && roundResults.every(x=>x==='c
   setTimeout(() => chimeSuccess(audioCtx, audioOut()), 150);
   setTimeout(smileProgressRow, 250);
   const key = currentNote.name;
+  // Capture BEFORE we write the new bestCents below — drives the
+  // post-success rotate-or-stay decision in the !retestNote branch.
+  const hadBestBefore = stats[key]?.bestCents != null;
   if (!stats[key]) stats[key]={};
   if (stats[key].bestCents==null || cents < stats[key].bestCents) {
     stats[key].bestCents = cents;
@@ -281,10 +284,19 @@ if (roundResults.length===settings.testsPerRound && roundResults.every(x=>x==='c
     } else {
       $('status-msg').textContent='Master level!';
     }
-    // Rotate to a new semi-random note (pickNote) while keeping the
-    // just-incremented centsIdx — variety beats sticking with the same
-    // note round after round.
-    setTimeout(()=>{ startRound(true); }, 3200);
+    // hadBestBefore: this note already had a baseline coming in, so
+    // stay on it and drill toward a finer best. !hadBestBefore: first
+    // successful pass on a new note — record the baseline and rotate
+    // to a fresh semi-random note so coverage expands across the range.
+    setTimeout(()=>{
+      if (hadBestBefore) {
+        clearProgress(); roundResults=[]; roundAttempts=0;
+        $('diff-value').textContent = fmtC(CENTS_SEQ[centsIdx]);
+        setupAttempt();
+      } else {
+        startRound(true);
+      }
+    }, 3200);
   }
   return;
 }
