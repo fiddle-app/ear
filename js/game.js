@@ -34,7 +34,10 @@ stats[noteName].attempts = (stats[noteName].attempts || 0) + 1;
 // ══════════════════════════════════════════════════════
 function noteDur() { return DUR_STEPS[settings.noteDurIdx]; }
 
-function startRound() {
+// keepCents=true skips the per-note centsIdx reset. Used by the
+// post-success path so the user keeps moving to a smaller difference
+// even after rotating to a new note.
+function startRound(keepCents = false) {
 awaiting=false; roundFailed=false;
 roundAttempts=0; roundResults=[];
 $('round-actions').style.display='none'; hideRetestEndActions();
@@ -44,9 +47,9 @@ const prevNote = currentNote;
 const note = pickNote(); currentNote=note;
 markAttempt(note.name);
 saveStats();
-logEvent(`startRound | note=${note.name} | cents=${fmtC(CENTS_SEQ[centsIdx])} | retest=${retestNote||'none'}`);
+logEvent(`startRound | note=${note.name} | cents=${fmtC(CENTS_SEQ[centsIdx])} | retest=${retestNote||'none'}${keepCents ? ' | keepCents' : ''}`);
 
-if (!retestNote) {
+if (!retestNote && !keepCents) {
   const bestCents = stats[note.name]?.bestCents;
   if (bestCents != null) {
     let idx = CENTS_SEQ.findIndex(c => c <= bestCents);
@@ -278,10 +281,10 @@ if (roundResults.length===settings.testsPerRound && roundResults.every(x=>x==='c
     } else {
       $('status-msg').textContent='Master level!';
     }
-    setTimeout(()=>{
-      $('diff-value').textContent = fmtC(CENTS_SEQ[centsIdx]);
-      clearProgress(); roundResults=[]; roundAttempts=0; setupAttempt();
-    }, 3200);
+    // Rotate to a new semi-random note (pickNote) while keeping the
+    // just-incremented centsIdx — variety beats sticking with the same
+    // note round after round.
+    setTimeout(()=>{ startRound(true); }, 3200);
   }
   return;
 }
