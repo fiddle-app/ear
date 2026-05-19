@@ -12,7 +12,16 @@ try {
   const t=localStorage.getItem('vio4-stats'); if(t) stats=JSON.parse(t);
 } catch(e){}
 }
-function saveSettings() { try{localStorage.setItem('vio4-settings',JSON.stringify(settings));}catch(e){} }
+function saveSettings() {
+  // Iterate over DEFAULTS so only the recognized settings keys are persisted —
+  // any stray properties that ended up on `settings` are dropped on save.
+  // Mirrors microbreaker's drift-immune pattern; see DEFAULTS in constants.js.
+  try {
+    const out = {};
+    for (const key of Object.keys(DEFAULTS)) out[key] = settings[key];
+    localStorage.setItem('vio4-settings', JSON.stringify(out));
+  } catch(e) {}
+}
 function saveStats()    { try{localStorage.setItem('vio4-stats',   JSON.stringify(stats));}catch(e){} }
 
 

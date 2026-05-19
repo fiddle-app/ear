@@ -51,15 +51,23 @@ function openResetDefaults() { $('reset-overlay').classList.add('open'); }
 function closeResetDefaults() { $('reset-overlay').classList.remove('open'); }
 function confirmResetDefaults() {
 $('reset-overlay').classList.remove('open');
-settings = {
-  lowestNote:22, highestNote:53,
-  startCentsIdx:2, noteDurIdx:3, attack:1, decay:1, soundIdx:2, testsPerRound:3,
-  volume:1.0,
-  voiceCommands: true, limitVrVocab: true, vcKeepLastWord: false,
-};
+// Iterate DEFAULTS so newly-added settings keys auto-reset — avoids the
+// drift bug microbreaker hit where Reset silently ignored vcKeepLastWord.
+// Array values get shallow-cloned so the reset doesn't share the DEFAULTS
+// reference. Ear-tuner has no user-edited lists to preserve, so this is a
+// single-path destructive reset (unlike microbreaker's two-branch UI).
+for (const key of Object.keys(DEFAULTS)) {
+  const val = DEFAULTS[key];
+  settings[key] = Array.isArray(val) ? [...val] : val;
+}
 saveSettings();
 centsIdx = settings.startCentsIdx;
 renderSettings();
+// Propagate VR-relevant changes to the recognizer (analogous to the
+// onLimitVrToggle / onVcKeepToggle handlers above).
+if (typeof vcOnSettingChange === 'function') {
+  vcOnSettingChange('vcKeepLastWord');
+}
 }
 
 // ══════════════════════════════════════════════════════
