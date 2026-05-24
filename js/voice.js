@@ -40,7 +40,7 @@ const VC_NAV_COMMANDS = {
   cmdSettings: ['settings'],
   cmdClose:    ['close'],
   cmdReplay:   ['replay'],
-  cmdContinue: ['continue'],
+  cmdContinue: ['continue', 'next'],
   cmdRetry:    ['retry'],
   cmdHigher:   ['higher'],
   cmdLower:    ['lower'],

@@ -119,6 +119,7 @@ if (s.type === 'sf') {
     })
     .catch(() => {
       $('status-msg').textContent = '';
+      showToast(`Could not download ${s.label}. Using synth.`);
       startRound();
     });
 } else {

@@ -125,6 +125,24 @@ letter-spacing: 0.05em;
 @media (min-width: 400px) { .hint-text { font-size: 14px; } }
 @media (orientation: landscape) { .hint-text { font-size: 12px; } }
 
+/* ── Toast notification ── */
+#toast {
+position: fixed;
+bottom: calc(var(--safe-bot) + 60px);
+left: 50%; transform: translateX(-50%);
+background: rgba(0,0,0,0.72);
+color: #fff;
+font-size: 13px;
+padding: 8px 18px;
+border-radius: 20px;
+pointer-events: none; z-index: 200;
+opacity: 0;
+transition: opacity 0.3s;
+white-space: nowrap; max-width: 90vw;
+text-align: center;
+}
+#toast.visible { opacity: 1; }
+
 /* ── Swipe hint ── */
 #swipe-hint {
 position: fixed;

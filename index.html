@@ -11,8 +11,8 @@
 <meta name="theme-color" id="meta-theme" content="#b83c08">
 <!-- Stamped by scripts/deploy.sh — used by the inline version-coherence
      check below to detect a hybrid-cache state at launch. Source ships
-     with 2026-05-19 01:38 as the literal placeholder. -->
-<meta name="ear-tuner-build" content="2026-05-19 01:38">
+     with 2026-05-23 21:18 as the literal placeholder. -->
+<meta name="ear-tuner-build" content="2026-05-23 21:18">
 <!-- PWA home-screen icon. MUST be a real PNG file reference — iOS Safari
      "Add to Home Screen" does not reliably accept data: URLs or JS-generated
      canvas icons. If you change this, test on iPad Safari: Share → Add to
@@ -533,6 +533,8 @@ if (window._etShowUpgradeModal) window._etShowUpgradeModal(window._etUpgrade);
 
 <div id="swipe-hint" class="hint-text">Tap the higher note, or swipe up/down to indicate that the 2nd note is higher/lower.</div>
 
+<div id="toast"></div>
+
 <!-- Retest close button: shown top-right during retest mode -->
 
 <button id="retest-close-btn" onclick="closeRetest()" aria-label="Close retest">
@@ -642,7 +644,7 @@ if (window._etShowUpgradeModal) window._etShowUpgradeModal(window._etUpgrade);
       <div class="tog-row">
         <div>
           <div class="s-label">Listen for voice commands</div>
-          <div class="s-sub">Say "higher", "lower", "replay", "continue", "info", "settings", "close", or a note name like "C sharp four"</div>
+          <div class="s-sub">Say "higher", "lower", "replay", "continue" (or "next"), "info", "settings", "close", or a note name like "C sharp four"</div>
         </div>
         <label class="tog-sw">
           <input type="checkbox" id="s-voice-chk" onchange="onVoiceToggle(this.checked)">

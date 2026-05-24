@@ -101,7 +101,7 @@ await ensureAudio();
 // we don't fall back to synth violin (which is much louder than the samples).
 const _snd = SOUNDS[settings.soundIdx];
 if (_snd.type === 'sf' && !sfInstruments[_snd.sfName]) {
-  try { await loadSfInstrument(_snd.sfName); } catch(e){}
+  try { await loadSfInstrument(_snd.sfName); } catch(e){ showToast(`Could not download ${_snd.label}. Using synth.`); }
 }
 logEvent(`playBothNotes | audioCtx.state=${audioCtx.state} | note=${currentNote?.name} | cents=${fmtC(CENTS_SEQ[centsIdx])}`);
 const dur = noteDur();
@@ -149,7 +149,7 @@ async function playOneNote(side) {
 await ensureAudio();
 const _snd2 = SOUNDS[settings.soundIdx];
 if (_snd2.type === 'sf' && !sfInstruments[_snd2.sfName]) {
-  try { await loadSfInstrument(_snd2.sfName); } catch(e){}
+  try { await loadSfInstrument(_snd2.sfName); } catch(e){ showToast(`Could not download ${_snd2.label}. Using synth.`); }
 }
 stopAllSounds();
 const dur = noteDur();

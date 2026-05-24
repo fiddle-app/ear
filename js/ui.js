@@ -747,7 +747,7 @@ if ($('start-btn').style.display === 'block') {
     $('status-msg').style.color = 'rgba(255,255,255,0.45)';
     loadSfInstrument(s.sfName)
       .then(() => { renderSoundGrid(); $('status-msg').textContent = ''; _startRetestInner(n); })
-      .catch(() => { $('status-msg').textContent = ''; _startRetestInner(n); });
+      .catch(() => { $('status-msg').textContent = ''; showToast(`Could not download ${s.label}. Using synth.`); _startRetestInner(n); });
     return;
   }
 }
@@ -1261,5 +1261,15 @@ async function reloadFromServer() {
     }
   } catch (e) { /* ignore — reload anyway */ }
   window.location.replace(window.location.pathname);
+}
+
+// ── Toast ──────────────────────────────────────────────
+let _toastTimer = null;
+function showToast(msg) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.add('visible');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('visible'), 4000);
 }
 
