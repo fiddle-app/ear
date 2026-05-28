@@ -11,8 +11,8 @@
 <meta name="theme-color" id="meta-theme" content="#b83c08">
 <!-- Stamped by scripts/deploy.sh — used by the inline version-coherence
      check below to detect a hybrid-cache state at launch. Source ships
-     with 2026-05-23 21:18 as the literal placeholder. -->
-<meta name="ear-tuner-build" content="2026-05-23 21:18">
+     with 2026-05-28 17:24 as the literal placeholder. -->
+<meta name="ear-tuner-build" content="2026-05-28 17:24">
 <!-- PWA home-screen icon. MUST be a real PNG file reference — iOS Safari
      "Add to Home Screen" does not reliably accept data: URLs or JS-generated
      canvas icons. If you change this, test on iPad Safari: Share → Add to
@@ -878,6 +878,11 @@ if (window._etShowUpgradeModal) window._etShowUpgradeModal(window._etUpgrade);
       <span id="info-copy-label">Paste into an email to share with a friend.</span>
     </div>
     <hr class="info-divider">
+    <div id="info-tip-row">
+      <p class="info-tip-label">Enjoying Ear Tuner? Leave me a tip!</p>
+      <a id="tip-btn" href="https://donate.stripe.com/6oU4gz0RR56j9pwauG4ow00" target="_blank" rel="noopener noreferrer"><span class="tip-icon">☕</span>&thinsp;Leave Casey a tip</a>
+    </div>
+    <hr class="info-divider">
 
     <div id="info-destructive-row">
       <button id="info-global-reset" onclick="confirmResetAll()">Reset All Scores</button>
@@ -925,6 +930,7 @@ if (window._etShowUpgradeModal) window._etShowUpgradeModal(window._etUpgrade);
     </div>
   </div>
 </div>
+
 
 
 <script src="soundfont-player.min.js"></script>
