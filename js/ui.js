@@ -125,6 +125,13 @@ const limitChk = $('s-limit-vr');
 if (limitChk) limitChk.checked = !!settings.limitVrVocab;
 const keepChk = $('s-vc-keep');
 if (keepChk) keepChk.checked = !!settings.vcKeepLastWord;
+const gainRow = $('s-vc-gain-row');
+if (gainRow) gainRow.style.display = settings.voiceCommands ? '' : 'none';
+const gb = settings.vcGainBoost || 2;
+const gainSlider = $('s-vc-gain-slider');
+if (gainSlider) gainSlider.value = gb;
+const gainVal = $('s-vc-gain-val');
+if (gainVal) gainVal.textContent = gb.toFixed(1) + '×';
 }
 
 function onLimitVrToggle(enabled) {
@@ -151,7 +158,7 @@ settings.voiceCommands = !!enabled;
 saveSettings();
 renderVoiceSettings();
 if (enabled) {
-  sessionUseVoice = true;
+  setSessionUseVoice(true);
   // Synchronous gesture-frame kick: mic + audio first, then vc load.
   // iOS Safari closes the getUserMedia() permission window after the
   // first async boundary, so acquireMic MUST be called before any await.
@@ -161,14 +168,20 @@ if (enabled) {
   Promise.all([audioP, micP]).then(([_, micOk]) => {
     if (!micOk) {
       console.warn('[settings] mic acquire failed — voice will not engage this session');
-      sessionUseVoice = false;
+      setSessionUseVoice(false);
       return;
     }
     if (typeof wlAcquire === 'function') wlAcquire('settings-voice-on');
   }).catch(e => console.warn('[settings] voice engage failed:', e));
 } else {
-  sessionUseVoice = false;
+  setSessionUseVoice(false);
   if (typeof vcStop === 'function') vcStop();
+  // Release the mic too — vcStop() only stops the recognizer. Without
+  // this the stream stays live and the session stays 'play-and-record'
+  // (mic indicator on, wrong category for a now-VC-off session) until the
+  // next background. releaseMic() stops the tracks and drops to
+  // 'playback'; toggling VC back on re-acquires. Symmetric with enable.
+  if (typeof releaseMic === 'function') releaseMic();
 }
 if (typeof vcOnSettingChange === 'function') vcOnSettingChange('voiceCommands');
 }
@@ -178,9 +191,18 @@ const pct = Math.max(0, Math.min(200, parseInt(percentStr, 10) || 0));
 settings.volume = pct / 100;
 saveSettings();
 $('s-volume-val').textContent = pct + '%';
-if (typeof masterGain !== 'undefined' && masterGain) {
-  masterGain.gain.value = settings.volume;
+if (typeof refreshMasterGain === 'function') refreshMasterGain();
+schedulePreview();
 }
+
+// Voice-mode volume boost (1×–4×). Applied on top of the Volume setting, but
+// only while the mic is live (see audio.js effectiveVolume / vcGainMultiplier).
+function adjustVcGainBoost(val) {
+const x = Math.max(1, Math.min(4, parseFloat(val) || 2));
+settings.vcGainBoost = x;
+saveSettings();
+$('s-vc-gain-val').textContent = x.toFixed(1) + '×';
+if (typeof refreshMasterGain === 'function') refreshMasterGain();
 schedulePreview();
 }
 
@@ -323,13 +345,13 @@ function closeHelloAndGo() {
 
 // Hello → "Yes, use voice today". Synchronously kicks audio + mic.
 function onHelloYes() {
-  sessionUseVoice = true;
+  setSessionUseVoice(true);
   const audioP = (typeof ensureAudio === 'function') ? ensureAudio() : Promise.resolve();
   const micP   = (typeof acquireMic === 'function') ? acquireMic() : Promise.resolve(false);
   Promise.all([audioP, micP]).then(([_, micOk]) => {
     if (!micOk) {
       console.warn('[hello] mic acquisition failed — proceeding without VR for this session');
-      sessionUseVoice = false;
+      setSessionUseVoice(false);
     } else if (typeof vcKickOffLoad === 'function') {
       // Lazy-load the Vosk bundle now that the user has opted in.
       try { vcKickOffLoad(); } catch (e) { console.warn('[hello] vcKickOffLoad threw:', e); }
@@ -344,7 +366,7 @@ function onHelloYes() {
 
 // Hello → "No, not today". Only unlocks the audio context.
 function onHelloNo() {
-  sessionUseVoice = false;
+  setSessionUseVoice(false);
   const audioP = (typeof ensureAudio === 'function') ? ensureAudio() : Promise.resolve();
   audioP.then(() => {
     if (typeof wlAcquire === 'function') wlAcquire('hello-no');
@@ -392,6 +414,38 @@ async function _onMaybeForegrounded() {
   if (!_wasBackgrounded) return;
   _wasBackgrounded = false;
   if (document.visibilityState !== 'visible') return;
+
+  // Failure-mode-4 recovery: re-assert session type on every visibility-
+  // regain. iOS may hand the hardware audio session to another app while
+  // we're backgrounded; writing to navigator.audioSession.type forces
+  // iOS to re-claim it for us (WebKit calls setCategoryOverride regardless
+  // of whether the value changed). This is the ONLY place we re-assert
+  // session type outside of acquire/release — visibility-regain is the
+  // correct trigger for cross-PWA session loss, not every tap.
+  //
+  // We do NOT set 'playback' when VC is on and mic is not yet live —
+  // that case is heading for Resume + acquireMic(), which will set
+  // 'play-and-record' after getUserMedia succeeds. Setting 'playback'
+  // here would be wrong and would persist until mic acquisition.
+  if (navigator.audioSession) {
+    try {
+      const micLive = typeof micStreamIsLive === 'function' && micStreamIsLive();
+      const before = navigator.audioSession.type;
+      let action;
+      if (micLive) {
+        navigator.audioSession.type = 'play-and-record';
+        action = 'play-and-record (mic live)';
+      } else if (!sessionUseVoice) {
+        navigator.audioSession.type = 'playback';
+        action = 'playback (VC off)';
+      } else {
+        // VC on + mic not live: don't touch — heading for Resume +
+        // acquireMic(), which will set 'play-and-record' with a real mic.
+        action = 'left untouched (VC on, mic not live)';
+      }
+      console.log('[gate] fg session-type: was=' + before + ' → ' + action);
+    } catch (_) {}
+  }
 
   // ── Probe both health signals ────────────────────────────────────
   const audioOk = (typeof isAudioContextHealthy === 'function')
@@ -485,6 +539,37 @@ function showResume(reason) {
   ov.classList.add('open');
 }
 
+// Half-flip mic recovery hook — invoked by _shared/js/mic.js
+// (_maybeRecoverForegroundMic) when the persistent-mute auto-release stopped
+// the stream but the app stayed foreground (incomplete app-switch). No
+// visibilitychange fires, so the normal foreground/Resume path never runs and
+// VC dies silently. We CANNOT re-acquire gesture-lessly — iOS pops a mic
+// permission prompt mid-app-carousel (confirmed 2026-06-02) — so route to the
+// SAME Resume flow as a real foreground regain; the re-acquire then happens
+// inside the user's Resume tap (a gesture frame, no prompt). Collision-guard:
+// if a real background+return already opened Resume (racing this timer), or
+// the mic somehow recovered, do nothing.
+function onMicAutoReleasedWhileForeground() {
+  if (typeof sessionUseVoice === 'undefined' || !sessionUseVoice) return;
+  if (typeof micStream !== 'undefined' && micStream) return;       // already recovered
+  const ov = $('resume-overlay');
+  if (ov && ov.classList.contains('open')) return;                 // normal Resume already up
+  // The half-flip skipped _onMaybeBackgrounded entirely, so the recognizer was
+  // never stopped — it's stuck 'listening' on the now-dead stream.
+  // _performResumeRebuild only re-binds voice when vc.state === 'ready', so
+  // without this vcStop() the Resume tap rebuilds audio + mic but VC stays
+  // dead (confirmed 2026-06-02: half-flip → Resume → VC still down; a full-flip
+  // then fixes it precisely because its background teardown calls vcStop).
+  // Mirror that teardown here so vc → 'ready' and the rebuild's vcStart fires.
+  if (typeof vcStop === 'function') vcStop();
+  console.log('[gate] half-flip recovery → Resume');
+  if (typeof isNative === 'function' && isNative()) {
+    _performResumeRebuild('mic-fg-stale');
+  } else {
+    showResume('mic-fg-stale');
+  }
+}
+
 // Resume tap — fresh user gesture frame. Per Casey's report, the
 // "probe-and-conditional-nuke" approach was returning healthy probes
 // for contexts that were actually dead, leaving audio silent after
@@ -536,7 +621,7 @@ function _performResumeRebuild(reason) {
   Promise.all([audioP, micP]).then(([_, micOk]) => {
     if (wantMic && !micOk) {
       console.warn('[resume] mic re-acquire failed — disabling VR for the rest of this session');
-      sessionUseVoice = false;
+      setSessionUseVoice(false);
     }
     if (typeof wlAcquire === 'function') wlAcquire('resume');
     if (sessionUseVoice && typeof vc !== 'undefined' && vc && vc.state === 'ready'

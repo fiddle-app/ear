@@ -4,10 +4,14 @@
 // Used by: microbreaker, ear-tuner
 // =================================================
 // Exposed globals: audioCtx, audioCtxGeneration, audioUnlocked, masterGain,
-//                  nukeAudioCtx(), ensureAudio(), muteMasterGain(),
-//                  unmuteMasterGain(), isAudioContextHealthy()
+//                  masterLimiter, nukeAudioCtx(), ensureAudio(),
+//                  muteMasterGain(), unmuteMasterGain(), refreshMasterGain(),
+//                  isAudioContextHealthy()
 // Each app's audio.js may add its own synth functions that reference audioCtx,
-// and optionally a getMasterGainForSettings() global (see _resolveMasterGain).
+// and optionally a getMasterGainForSettings() global (see _resolveMasterGain)
+// and a getMasterLimiterOptions() global (see ensureAudio — opt-in master
+// limiter; apps that don't define it keep the direct masterGain→destination
+// wiring unchanged).
 //
 // =================================================
 // DOCTRINE — read this before changing recovery code
@@ -93,18 +97,34 @@
 //                        only — NOT to A2DP, NOT to AirPlay, NOT to
 //                        car stereo. The "voice call" category.
 //
-// Dynamic switch policy: ensureAudio reads `appWantsMic()` (resolver
-// pattern — each app defines it) and sets the right category. acquireMic
-// forces 'play-and-record' just before getUserMedia (belt-and-suspenders
-// for the case where appWantsMic flipped true after the last ensureAudio).
-// releaseMic re-evaluates and may drop back to 'playback'.
+// Two write disciplines, by the value being written:
 //
-// Trigger that prompted the dynamic switch: Casey's 2026-05-13 car
-// test. Both apps were unconditionally 'play-and-record' which meant
-// notes played through the iPad speaker even with the car's Bluetooth
-// connected. YouTube and music apps routed correctly to the car —
-// because they use 'playback' category. Switching to dynamic gives
-// the same routing behaviour when mic isn't needed.
+// HARDCODED writes — definitionally correct for their call site:
+//   1. Module init (audio-ctx.js bottom): 'playback' at page load.
+//   2. acquireMic() (mic.js): 'play-and-record' BEFORE getUserMedia
+//      (iOS 18+ rejects it from 'playback') and again after success.
+//   3. releaseMic() (mic.js): 'playback' immediately.
+//
+// INTENT-BASED writes — go through _resolveAudioSessionType(), which is
+// safe to call at any lifecycle point without risking a transitional
+// wrong value:
+//   4. ensureAudio() (this file): re-assert after create/resume. Re-claims
+//      the hardware session for a fresh context (failure mode 4) and lands
+//      'play-and-record' ahead of the concurrent acquireMic on rebuild.
+//   5. _onMaybeForegrounded() (ui.js): re-assert on visibility-regain for
+//      failure-mode-4 cross-PWA session recovery.
+//
+// NOTE on (5): it is intentionally NOT a blind _resolveAudioSessionType()
+// write. When VC is on but the mic is not yet live (screen-lock release),
+// it leaves the type UNTOUCHED — the flow is heading for Resume +
+// acquireMic, which will set 'play-and-record' with a real mic. Writing
+// 'play-and-record' there would route to the iPhone earpiece at inaudible
+// volume for the whole Resume-modal window — 'play-and-record' WITHOUT a
+// live mic does this, confirmed 2026-06-02. Never use it as a base state.
+// (This is why ensureAudio's intent-based write is safe but the foreground
+// re-assert needs the extra mic-live guard: ensureAudio always runs with a
+// mic present or being acquired in the same frame; the foreground path may
+// not be.)
 //
 // ── Things we tried that did NOT work ──
 //
@@ -152,6 +172,12 @@ let audioCtxGeneration = 0;   // bumped on every recreate — stale refs detect 
 let audioUnlocked     = false;
 
 let masterGain = null;
+// Optional master limiter (DynamicsCompressor) inserted between masterGain and
+// destination when the app defines getMasterLimiterOptions(). null when unused.
+let masterLimiter = null;
+// True while muteMasterGain() is in effect. refreshMasterGain() honours this so
+// a volume / boost / VC-state change can't silently defeat an active mute.
+let masterMuted = false;
 
 // Default master-gain resolver. Each app can define a global
 // `getMasterGainForSettings()` to return the right initial gain for its
@@ -174,34 +200,67 @@ function _resolveMasterGain() {
   return (parseFloat(settings.notifyVol) || 0.35) / 0.35;
 }
 
-// Resolves the desired iOS audio session category. Each app can define
-// a global `appWantsMic()` returning true/false. The category controls
+// Resolves the desired iOS audio session category. The category controls
 // iOS hardware routing:
 //
 //   'playback'         — output-only. Routes to Bluetooth A2DP (stereo
 //                        music quality), AirPlay, headphones, car audio.
-//                        Matches what music apps and YouTube use.
-//                        iOS 18+ REJECTS getUserMedia from this category.
+//                        Uses the MEDIA volume rail. CONFIRMED 2026-06-02:
+//                        VC-off output is tightly + bidirectionally coupled
+//                        to the media rail (moving the YouTube/media slider
+//                        moves our volume and vice-versa). iOS 18+ REJECTS
+//                        getUserMedia from this category.
 //   'play-and-record'  — full duplex (output + input). Required for
 //                        getUserMedia on iOS 18+. Routes output to
 //                        device speaker / HFP mono Bluetooth only —
 //                        NOT to A2DP, NOT to AirPlay. The "voice call"
-//                        category.
+//                        category. Uses the SPEAKERPHONE volume rail.
+//                        CONFIRMED 2026-06-02: VC-on output is tightly +
+//                        bidirectionally coupled to the speakerphone rail
+//                        (a voicemail played on speakerphone moves our
+//                        volume and vice-versa). It is NOT the media rail
+//                        and NOT the Ringtones & Alerts rail — even with
+//                        "Change with Buttons" on. Not readable from a PWA;
+//                        only a native plugin can normalize it.
 //
-// We use 'playback' when the app doesn't need mic (better routing UX —
-// audio reaches Bluetooth car stereo / AirPods / etc.) and switch to
-// 'play-and-record' when mic is actually needed (VR engaged, recording
-// active). acquireMic() in mic.js also forces 'play-and-record' just
-// before getUserMedia as a belt-and-suspenders measure.
+// Policy: intent-based — 'play-and-record' when VC is on (sessionUseVoice),
+// 'playback' otherwise. NOT keyed on micStreamIsLive(): the mic is never
+// live at the moments this is called (fresh context / foreground after a
+// mic-releasing background), so a ground-truth check would collapse to
+// 'playback' every time. See _resolveAudioSessionType + the doctrine block.
 //
-// Apps without the override default to 'play-and-record' (current
-// behaviour preserved — safe choice for an unknown app that may or
-// may not need mic).
+// 'playback' → media volume rail, A2DP / car stereo / AirPlay routing.
+// 'play-and-record' → required for active getUserMedia on iOS 18+.
+//
+// Volume inconsistency between VC-on and VC-off is a known iOS limitation:
+// iOS voice processing (activated when a mic stream is live) boosts the
+// output path regardless of what the web page does. This cannot be
+// controlled via the Web API. Known fixes:
+//   • Capacitor native plugin: set AVAudioSessionMode.measurement to
+//     disable iOS voice processing, read outputVolume to normalize.
+//   • Web: no solution — accept the difference or use the in-app
+//     volume slider to compensate per-mode.
+//
+// 'play-and-record' WITHOUT a live mic stream routes to the iPhone
+// earpiece at inaudible volume — do NOT use it as a base state.
+//
+// History: unconditional play-and-record → dynamic appWantsMic() →
+// micStreamIsLive() → always playback → always play-and-record (earpiece
+// routing — unusable) → micStreamIsLive() → intent-based (sessionUseVoice).
+// Each experiment is documented in the session log. 2026-06-02.
 function _resolveAudioSessionType() {
-  if (typeof appWantsMic === 'function') {
-    try { return appWantsMic() ? 'play-and-record' : 'playback'; } catch (_) {}
+  // Intent-based, via the appWantsMic() callback each app defines in its
+  // app-local audio.js (NOT a synced file). This is the shared contract —
+  // ear-tuner answers with sessionUseVoice; microbreaker answers with
+  // (recording || voiceCommands). When the app wants the mic we need
+  // 'play-and-record'; otherwise 'playback'. Guard for shared-module use in
+  // an app that never defines the callback (defaults to playback). Do NOT
+  // hardcode a single app's gate (e.g. sessionUseVoice) here — that breaks
+  // every sibling app that gates the mic differently.
+  if (typeof appWantsMic === 'function' && appWantsMic()) {
+    return 'play-and-record';
   }
-  return 'play-and-record';
+  return 'playback';
 }
 
 function nukeAudioCtx(reason) {
@@ -210,6 +269,12 @@ function nukeAudioCtx(reason) {
   const old = audioCtx;
   audioCtx   = null;
   masterGain = null;
+  masterLimiter = null;
+  // Reset mute state with the graph: a rebuilt context starts on a fresh
+  // masterGain, and the foreground path always calls unmuteMasterGain() (or
+  // ensureAudio sets the resolved gain) after a nuke+rebuild, so starting
+  // unmuted can't strand audio silent.
+  masterMuted = false;
   audioUnlocked = false;
   audioCtxGeneration++;
   // Soundfont instruments are bound to the old context — clear so they reload on next play.
@@ -253,7 +318,28 @@ async function ensureAudio() {
     });
     masterGain = audioCtx.createGain();
     masterGain.gain.value = _resolveMasterGain();
-    masterGain.connect(audioCtx.destination);
+    // Optional app-provided master limiter. If the app defines
+    // getMasterLimiterOptions() returning a config object, insert a
+    // DynamicsCompressor (brick-wall) between masterGain and destination —
+    // lets an app run hot per-voice gains (and a >1 volume/boost) without
+    // clipping transients. Apps that don't define it keep the original
+    // direct wiring, so siblings are unaffected.
+    let limOpts = null;
+    if (typeof getMasterLimiterOptions === 'function') {
+      try { limOpts = getMasterLimiterOptions(); } catch (_) {}
+    }
+    if (limOpts) {
+      masterLimiter = audioCtx.createDynamicsCompressor();
+      masterLimiter.threshold.value = limOpts.threshold ?? -2;
+      masterLimiter.knee.value      = limOpts.knee      ?? 0;
+      masterLimiter.ratio.value     = limOpts.ratio     ?? 20;
+      masterLimiter.attack.value    = limOpts.attack    ?? 0.003;
+      masterLimiter.release.value   = limOpts.release   ?? 0.10;
+      masterGain.connect(masterLimiter);
+      masterLimiter.connect(audioCtx.destination);
+    } else {
+      masterGain.connect(audioCtx.destination);
+    }
   }
   // 'suspended' is the normal post-create state (resumes via user
   // gesture). 'interrupted' is Safari-only: an in-flight iOS audio
@@ -264,40 +350,17 @@ async function ensureAudio() {
     try { await audioCtx.resume(); } catch(e){}
   }
   audioUnlocked = true;
-  // Set the audio session category — UNCONDITIONALLY (re-assign even
-  // when navigator.audioSession.type already reads the desired value).
-  //
-  // Why unconditional: the `audioSession.type` field is per-document.
-  // When the user switches between two fiddle-family PWAs (or our PWA
-  // and another audio app), iOS hands the hardware session to whichever
-  // is foregrounded. Our document's type field stays at its last
-  // setting because we never wrote anything else — but the iOS
-  // hardware path is owned by the other app. The conditional skip
-  // ("type already matches") would miss the cross-PWA case and
-  // AudioContext.destination would silently produce no output.
-  // (Confirmed by Casey 2026-05-13 16:20: ear-tuner → microbreaker →
-  // ear-tuner produced state='running' but no audible output until
-  // we dropped the conditional. Failure mode 4 in the doctrine block.)
-  //
-  // The TYPE itself is dynamic — see _resolveAudioSessionType. Apps
-  // that need mic (VR active, recording active) get 'play-and-record';
-  // apps in playback-only mode get 'playback', which routes through
-  // Bluetooth A2DP / AirPlay / car stereo. Casey's 2026-05-13 car
-  // test caught this: 'play-and-record' had been the unconditional
-  // category, so notes played through the device speaker instead of
-  // car Bluetooth.
-  //
-  // The setter is cheap on iOS when the value already matches; the
-  // idempotent re-assignment serves as our session-claim re-assertion.
-  //
-  // Pre-iOS-18, 'playback' worked even when mic was needed because
-  // getUserMedia didn't enforce a category match. iOS 18 made the
-  // category strict: getUserMedia on a 'playback' session rejects with
-  // InvalidStateError. The dynamic switch is how we keep both worlds
-  // working — see mic.js acquireMic for the gesture-frame switch
-  // ahead of getUserMedia.
+  // Re-assert the session category through the single source of truth.
+  // Re-writing a consistent value is harmless (WebKit's setCategoryOverride
+  // is idempotent for our purposes) and earns its keep twice: (1) after a
+  // fresh AudioContext following old.close(), it re-claims the hardware
+  // session (failure mode 4); (2) on the VC-on rebuild paths it lands
+  // 'play-and-record' ahead of the concurrent acquireMic(). It never
+  // creates a *sustained* mic-less 'play-and-record': every VC-on caller
+  // of ensureAudio() either already holds the mic (Branch B/C) or acquires
+  // it concurrently (onHelloYes / onVoiceToggle / _performResumeRebuild).
   if (navigator.audioSession) {
-    try { navigator.audioSession.type = _resolveAudioSessionType(); } catch(e){}
+    try { navigator.audioSession.type = _resolveAudioSessionType(); } catch (e) {}
   }
 }
 
@@ -310,6 +373,7 @@ async function ensureAudio() {
 // .stop() times will clean them up.
 function muteMasterGain() {
   if (!audioCtx || !masterGain) return;
+  masterMuted = true;
   try {
     masterGain.gain.cancelScheduledValues(audioCtx.currentTime);
     masterGain.gain.setValueAtTime(0, audioCtx.currentTime);
@@ -321,11 +385,25 @@ function muteMasterGain() {
 // playing without forcing the user through a Resume modal.
 function unmuteMasterGain() {
   if (!audioCtx || !masterGain) return;
+  masterMuted = false;
   try {
     const v = _resolveMasterGain();
     masterGain.gain.cancelScheduledValues(audioCtx.currentTime);
     masterGain.gain.setValueAtTime(v, audioCtx.currentTime);
   } catch (e) {}
+}
+
+// Re-apply the app's current target gain (_resolveMasterGain → the app's
+// getMasterGainForSettings) — but ONLY when not muted, so a volume / boost /
+// VC-state change can't defeat an active mute. Apps call this whenever an
+// input to their effective volume changes (volume slider, VC boost, VC
+// on/off). No-op before the graph exists or while muted.
+function refreshMasterGain() {
+  if (!audioCtx || !masterGain || masterMuted) return;
+  // Bare .value= (not cancelScheduledValues+setValueAtTime) is fine: nothing
+  // schedules automation on masterGain.gain itself — per-note envelopes live on
+  // their own gain nodes, and mute/unmute are guarded by masterMuted above.
+  try { masterGain.gain.value = _resolveMasterGain(); } catch (e) {}
 }
 
 // Liveness probe: distinguishes a healthy AudioContext from the iOS
@@ -397,6 +475,16 @@ window.addEventListener('focus',     () => { console.log('[bg] window-focus'); }
 // Page Lifecycle API — Safari ships these on some iOS versions; cheap to listen even when no-op.
 document.addEventListener('freeze',  () => { console.log('[bg] freeze'); });
 document.addEventListener('resume',  () => { console.log('[bg] resume'); });
+
+// Baseline session type: 'playback' at page load. This is the correct
+// state before any mic is acquired. acquireMic() overrides to
+// 'play-and-record' on success; releaseMic() resets to 'playback'.
+// Failure-mode-4 re-assertion is handled in _onMaybeForegrounded()
+// (ui.js), not here — visibility-regain is the right trigger for
+// cross-PWA session loss, not every tap.
+if (navigator.audioSession) {
+  try { navigator.audioSession.type = 'playback'; } catch (_) {}
+}
 
 // iOS/iPadOS: unlock audio context on any touch, in case ensureAudio()
 // was never called (e.g. foot pedal was first interaction)

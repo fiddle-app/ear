@@ -5,7 +5,44 @@
 // regain). Ear-tuner drives masterGain directly from settings.volume —
 // the shared module's notifyVol fallback would otherwise pin gain to 1.0.
 function getMasterGainForSettings() {
-  return (typeof settings !== 'undefined' && settings) ? settings.volume : 1.0;
+  return effectiveVolume();
+}
+
+// Opt-in master limiter consumed by _shared/js/audio-ctx.js (ensureAudio).
+// Defining this inserts a DynamicsCompressor brick-wall between masterGain and
+// destination. Ear-tuner voices are calibrated hot (perceptual/LUFS match at a
+// -12 LUFS target; see VOICE_GAIN in constants.js + the synth/sine peaks below)
+// so the sustained voices are ~10 dB louder than the old RMS calibration. The
+// plucked instruments (guitar/piano/bass) have 14-20 dB attack transients that
+// would clip at that level; this limiter shaves those attacks instead. It also
+// catches the vcGainBoost (×2-4) overshoot in VC mode. Threshold -2 sits above
+// every sustained voice's true peak (≤ -3.1 dBTP), so the fiddle voices pass
+// through untouched; only the plucked attacks and boosted VC output are limited.
+// Calibrated 2026-06-07 (calibrate2.js, ebur128 / ITU-R BS.1770).
+function getMasterLimiterOptions() {
+  return { threshold: -2, knee: 0, ratio: 20, attack: 0.003, release: 0.10 };
+}
+
+// VC-mode loudness compensation. We disable iOS voice processing (VPIO) on the
+// mic to dodge the earpiece/quiet trap (see appMicConstraints), but that also
+// drops VPIO's AGC boost — so when the app wants the mic, output rides the
+// quieter speakerphone rail. Multiply the master gain by settings.vcGainBoost
+// (1×–4×, default 2×) to compensate. Gated on appWantsMic() (the app-local
+// intent hook) rather than micStreamIsLive(): the live-mic check flickers false
+// during the brief mute/unmute events of normal use, which would make playback
+// volume lurch mid-round — the intent is stable. Matches microbreaker's gating.
+// Confirmed 2026-06-02.
+function vcGainMultiplier() {
+  if (typeof appWantsMic === 'function' && appWantsMic()) {
+    return (typeof settings !== 'undefined' && settings && settings.vcGainBoost)
+      ? settings.vcGainBoost : 1;
+  }
+  return 1;
+}
+
+function effectiveVolume() {
+  const base = (typeof settings !== 'undefined' && settings) ? settings.volume : 1.0;
+  return base * vcGainMultiplier();
 }
 
 // Resolver consumed by _shared/js/audio-ctx.js (ensureAudio) and
@@ -20,12 +57,42 @@ function appWantsMic() {
   return typeof sessionUseVoice !== 'undefined' && !!sessionUseVoice;
 }
 
+// Single choke point for changing sessionUseVoice. It gates the VC volume boost
+// (vcGainMultiplier → effectiveVolume), so every flip must re-apply the master
+// gain — otherwise the boost wouldn't take effect until the next context
+// rebuild. refreshMasterGain() is mute-aware, so this is safe to call from any
+// lifecycle path (resume, mic-fail) without defeating a mute. Route ALL
+// sessionUseVoice writes through here to keep gain in sync (B3).
+function setSessionUseVoice(v) {
+  sessionUseVoice = !!v;
+  if (typeof refreshMasterGain === 'function') refreshMasterGain();
+}
+
+// Mic constraints consumed by _shared/js/mic.js (getUserMedia). Disable iOS
+// voice processing — echoCancellation / noiseSuppression / autoGainControl —
+// so capture does NOT engage the voice-processing I/O unit (VPIO). VPIO
+// reroutes output to the iPhone earpiece at attenuated volume and sticks for
+// the whole AVAudioSession with no web API to clear it (confirmed 2026-06-02:
+// VC use, mic-denial, and VC-on→off all left audio quiet until reboot).
+// Disabling the processing keeps 'play-and-record' on the main speaker / media
+// rail, loud — the same approach microbreaker uses. Bonus: cleaner raw audio
+// for the Vosk recognizer. ear-tuner had this (commit 819623a) but it was lost
+// in the blanket revert 5373f27; restored here as the actual fix.
+function appMicConstraints() {
+  return {
+    audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+    video: false
+  };
+}
+
 // Audio output destination — masterGain (when audioCtx exists) lets the
 // Volume setting scale every tone, beep, and chime in one place. Falls back
-// to ctx.destination if masterGain is not yet built.
+// to ctx.destination if masterGain is not yet built. PURE GETTER: gain is
+// kept current by refreshMasterGain() at the points effectiveVolume()'s inputs
+// change (adjustVolume, adjustVcGainBoost, setSessionUseVoice) — NOT here, so
+// this can't defeat an active mute (see _shared refreshMasterGain / B3).
 function audioOut() {
   if (typeof masterGain !== 'undefined' && masterGain) {
-    masterGain.gain.value = settings.volume;
     return masterGain;
   }
   return audioCtx.destination;
@@ -56,7 +123,8 @@ return sfLoadingP[sfName];
 // ══════════════════════════════════════════════════════
 function playSfNote(inst, midiF, startTime, duration, gain) {
 // Refresh instrument destination to current masterGain — handles instruments
-// loaded before audioCtx existed AND syncs masterGain.gain.value to settings.volume.
+// loaded before audioCtx existed. (Master gain level is owned by
+// refreshMasterGain(), not this path — see audioOut.)
 const dest = audioOut();
 if (inst && 'destination' in inst) inst.destination = dest;
 // soundfont-player: inst.play(note, time, options) — accepts fractional midi for detuning
@@ -70,7 +138,7 @@ function playSynthViolin(freqHz, startTime, duration) {
 const ctx    = audioCtx;
 const atk    = ATK_PRESETS[settings.attack][1];
 const rel    = DEC_PRESETS[settings.decay][1];
-const peak   = 0.137, sus=0.65, dec=0.10;
+const peak   = 0.695, sus=0.65, dec=0.10;
 
 const mg = ctx.createGain(); mg.connect(audioOut());
 mg.gain.setValueAtTime(0,startTime);
@@ -114,8 +182,8 @@ const atk = ATK_PRESETS[settings.attack][1];
 const rel = DEC_PRESETS[settings.decay][1];
 const osc=ctx.createOscillator(), g=ctx.createGain();
 osc.type='sine'; osc.frequency.setValueAtTime(freqHz,startTime);
-g.gain.setValueAtTime(0,startTime); g.gain.linearRampToValueAtTime(0.112,startTime+atk);
-g.gain.setValueAtTime(0.112,startTime+duration-rel); g.gain.linearRampToValueAtTime(0,startTime+duration);
+g.gain.setValueAtTime(0,startTime); g.gain.linearRampToValueAtTime(0.385,startTime+atk);
+g.gain.setValueAtTime(0.385,startTime+duration-rel); g.gain.linearRampToValueAtTime(0,startTime+duration);
 osc.connect(g); g.connect(audioOut());
 osc.start(startTime); osc.stop(startTime+duration+0.1);
 return { gain:g, stopAt(t){ g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(g.gain.value,t); g.gain.linearRampToValueAtTime(0,t+0.04); try{osc.stop(t+0.05);}catch(e){} } };

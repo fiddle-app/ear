@@ -22,11 +22,29 @@
 //
 // Globals exposed: micStream, acquireMic, releaseMic, micStreamIsLive.
 // Globals consumed: audioCtx, audioUnlocked (from audio-ctx.js).
+// Optional app hooks (defined app-local, guarded by typeof here):
+//   appMicConstraints()                 — getUserMedia constraints
+//   appWantsMic()                       — drives the audio-session category
+//   onMicAutoReleasedWhileForeground()  — half-flip recovery handoff
+//   onMicAcquired()                     — fires after every successful acquire;
+//                                         apps use it for post-acquire
+//                                         workarounds (e.g. microbreaker's
+//                                         one-shot iOS route-heal cycle). Owns
+//                                         its own one-shot / idempotency.
 // =================================================
 
 let micStream     = null;
 const _MIC_PERSISTENT_MUTE_MS = 300;
 let _micPersistentMuteTimer   = null;
+// Foreground ("half-flip") recovery tuning — see _maybeRecoverForegroundMic.
+// The delay MUST exceed the observed auto-release→background lag (~0.9s,
+// 2026-06-02) so that a real screen-lock has already fired
+// visibilitychange→hidden by the time we check — otherwise we'd wrongly
+// "recover" the mic while a lock is mid-flight. Cooldown guards against a
+// mute→release→reacquire thrash loop if iOS keeps re-muting.
+const _MIC_FG_RECOVERY_DELAY_MS    = 1500;
+const _MIC_FG_RECOVERY_COOLDOWN_MS = 4000;
+let   _micFgRecoveryAt             = 0;
 // In-flight getUserMedia promise — concurrent callers share this so we
 // don't double-prompt on iOS or leak the first stream when two paths
 // (e.g., a pointerdown warm-up + a click handler) both call acquireMic
@@ -46,16 +64,36 @@ async function acquireMic() {
   if (_micAcquireP) return _micAcquireP;
   _micAcquireP = (async () => {
     try {
-      // Force 'play-and-record' before getUserMedia. iOS 18+ rejects
-      // getUserMedia with InvalidStateError if the audio session is
-      // currently 'playback'. ensureAudio's resolver may have set
-      // 'playback' if appWantsMic was false at that moment (e.g., VR
-      // toggled on AFTER ensureAudio ran); we override here because
-      // by definition the caller wants mic right now.
+      // Pre-set 'play-and-record' BEFORE getUserMedia. iOS 18+ rejects
+      // getUserMedia from a 'playback' session with InvalidStateError,
+      // and the session may well be 'playback' here: ensureAudio() no
+      // longer sets the type, so on the initial VC-on path (onHelloYes /
+      // onVoiceToggle) the only prior write is the module-init 'playback'
+      // baseline. acquireMic now owns the guarantee that the category is
+      // correct when getUserMedia evaluates it.
       if (navigator.audioSession) {
-        try { navigator.audioSession.type = 'play-and-record'; } catch(e){}
+        try { navigator.audioSession.type = 'play-and-record'; } catch (_) {}
       }
-      micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      // Mic constraints come from the app via appMicConstraints() (app-local,
+      // like appWantsMic). Fiddle apps disable iOS voice processing
+      // (echoCancellation / noiseSuppression / autoGainControl) because the
+      // default-on processing engages the voice-processing I/O unit (VPIO),
+      // which reroutes output to the iPhone earpiece at attenuated volume and
+      // STICKS for the whole AVAudioSession with no web API to undo it
+      // (confirmed 2026-06-02; microbreaker avoids the trap exactly this way).
+      // Default to plain audio if the app defines no hook.
+      const _micConstraints = (typeof appMicConstraints === 'function')
+        ? appMicConstraints()
+        : { audio: true, video: false };
+      micStream = await navigator.mediaDevices.getUserMedia(_micConstraints);
+      // Re-confirm session type immediately on successful acquisition —
+      // do NOT wait for the next ensureAudio() call (which may never come
+      // in VC gameplay since the user never touches the screen). This is
+      // the authoritative moment: mic is live, session must be
+      // 'play-and-record'. Symmetric with releaseMic() → 'playback'.
+      if (navigator.audioSession) {
+        try { navigator.audioSession.type = 'play-and-record'; } catch (_) {}
+      }
       const tracks = micStream.getAudioTracks();
       console.log('[mic] acquired tracks=' + tracks.length +
                   ' visible=' + (document.visibilityState === 'visible'));
@@ -84,6 +122,7 @@ async function acquireMic() {
             _micPersistentMuteTimer = null;
             console.log('[mic] auto-release on persistent mute (experiment)');
             releaseMic();
+            _maybeRecoverForegroundMic();
           }, _MIC_PERSISTENT_MUTE_MS);
         });
         track.addEventListener('unmute', () => {
@@ -102,10 +141,25 @@ async function acquireMic() {
       if (typeof audioUnlocked !== 'undefined') {
         audioUnlocked = true;
       }
+      // Optional post-acquire app hook. Fires on EVERY successful acquisition;
+      // the app owns any one-shot guarding (microbreaker uses it for the iOS
+      // first-acquire route-heal cycle). Wrapped so a throwing hook can't fail
+      // the acquire we just completed.
+      if (typeof onMicAcquired === 'function') {
+        try { onMicAcquired(); } catch (e) { console.warn('[mic] onMicAcquired hook threw:', e); }
+      }
       return true;
     } catch(e) {
       console.warn('getUserMedia failed:', e);
       micStream = null;
+      // Undo the pre-set 'play-and-record' from above. With no mic stream
+      // it would route output to the iPhone earpiece at inaudible volume
+      // (confirmed 2026-06-02). Callers (onHelloYes / onVoiceToggle /
+      // handleStart) drop sessionUseVoice on failure but do NOT call
+      // releaseMic(), so this is the only cleanup point for the pre-set.
+      if (navigator.audioSession) {
+        try { navigator.audioSession.type = 'playback'; } catch (_) {}
+      }
       return false;
     } finally {
       _micAcquireP = null;
@@ -132,18 +186,53 @@ function releaseMic() {
     try { micStream.getTracks().forEach(t => t.stop()); } catch (e) {}
     micStream = null;
   }
-  // Re-evaluate the audio session category after release. If the app
-  // no longer wants mic (e.g., VR toggled off, persistent-mute auto-
-  // release with no other mic consumer), drop back to 'playback' so
-  // output routes through Bluetooth A2DP / AirPlay / car stereo
-  // instead of the device speaker. If something else still wants mic,
-  // the resolver returns 'play-and-record' and the setter is a no-op.
-  if (navigator.audioSession && typeof appWantsMic === 'function') {
-    try {
-      const t = appWantsMic() ? 'play-and-record' : 'playback';
-      navigator.audioSession.type = t;
-    } catch (e) {}
+  // Always drop to 'playback' on release. The mic stream is gone, so
+  // 'play-and-record' (duplex/HFP mode) serves no purpose. 'playback'
+  // routes output through Bluetooth A2DP / AirPlay / car stereo and
+  // uses the media volume rail. On re-acquire, acquireMic() will force
+  // 'play-and-record' back before getUserMedia.
+  if (navigator.audioSession) {
+    try { navigator.audioSession.type = 'playback'; } catch (e) {}
   }
+}
+
+// Half-flip recovery. The persistent-mute auto-release above exists for the
+// pre-lock cascade (screen lock → app backgrounds → the foreground/Resume
+// path rebuilds the mic). But iOS also briefly mutes the mic on an
+// *incomplete* app-switch gesture ("half-flip") while the app stays
+// foreground. There the auto-release stops the stream but NO visibilitychange
+// fires — so the app's Resume recovery never runs, and in voice-command mode
+// (no taps) the mic stays dead until a full app round-trip. Confirmed repro
+// 2026-06-02 17:41.
+//
+// Detect that case — still visible a beat after the release — and hand it to
+// the app's onMicAutoReleasedWhileForeground() hook. The app routes to its
+// Resume/gesture flow: a gesture-less acquireMic() here pops an iOS mic
+// permission prompt mid-app-carousel (confirmed 2026-06-02), so recovery MUST
+// happen inside a user gesture. A real lock is excluded because by
+// _MIC_FG_RECOVERY_DELAY_MS the app has already gone hidden (the normal
+// foreground/Resume path owns that). The cooldown prevents thrash.
+function _maybeRecoverForegroundMic() {
+  setTimeout(() => {
+    if (document.visibilityState !== 'visible') return;  // real lock → leave for the Resume path
+    if (micStream) return;                               // already recovered (iOS un-muted / gesture path)
+    if (!(typeof appWantsMic === 'function' && appWantsMic())) return;
+    const now = Date.now();
+    if (now - _micFgRecoveryAt < _MIC_FG_RECOVERY_COOLDOWN_MS) {
+      console.log('[mic] fg-recovery skipped — cooldown');
+      return;
+    }
+    _micFgRecoveryAt = now;
+    if (typeof onMicAutoReleasedWhileForeground === 'function') {
+      console.log('[mic] fg-recovery — handing to app (half-flip)');
+      onMicAutoReleasedWhileForeground();
+    } else {
+      // No app handler: a gesture-less acquireMic() pops an iOS mic permission
+      // prompt mid-app-carousel (confirmed 2026-06-02), so don't — the app
+      // must own recovery and route it through a user gesture.
+      console.log('[mic] fg-recovery — no app handler; cannot recover without a gesture');
+    }
+  }, _MIC_FG_RECOVERY_DELAY_MS);
 }
 
 // True if our cached micStream is still usable. iOS may end the

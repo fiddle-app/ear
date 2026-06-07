@@ -11,8 +11,8 @@
 <meta name="theme-color" id="meta-theme" content="#b83c08">
 <!-- Stamped by scripts/deploy.sh — used by the inline version-coherence
      check below to detect a hybrid-cache state at launch. Source ships
-     with 2026-05-28 17:24 as the literal placeholder. -->
-<meta name="ear-tuner-build" content="2026-05-28 17:24">
+     with 2026-06-07 14:18 as the literal placeholder. -->
+<meta name="ear-tuner-build" content="2026-06-07 14:18">
 <!-- PWA home-screen icon. MUST be a real PNG file reference — iOS Safari
      "Add to Home Screen" does not reliably accept data: URLs or JS-generated
      canvas icons. If you change this, test on iPad Safari: Share → Add to
@@ -652,6 +652,17 @@ if (window._etShowUpgradeModal) window._etShowUpgradeModal(window._etUpgrade);
           <div class="tog-thumb"></div>
         </label>
       </div>
+      <div class="s-row" id="s-vc-gain-row" style="display:none;">
+        <div>
+          <div class="s-label">Voice-mode volume boost</div>
+          <div class="s-sub">Compensates for the quieter voice/mic audio rail (applies only while listening)</div>
+        </div>
+        <div class="s-volume-control">
+          <input type="range" id="s-vc-gain-slider" min="1" max="4" step="0.1" value="2"
+                 oninput="adjustVcGainBoost(this.value)" aria-label="Voice-mode volume boost">
+          <div class="s-val" id="s-vc-gain-val">2.0×</div>
+        </div>
+      </div>
       <div class="tog-row" id="s-vc-keep-row" style="display:none;">
         <div>
           <div class="s-label">Keep last word on-screen</div>
@@ -794,7 +805,6 @@ if (window._etShowUpgradeModal) window._etShowUpgradeModal(window._etUpgrade);
       <button id="hello-yes-btn" onclick="onHelloYes()" style="flex:1;">Yes, use voice</button>
       <button id="hello-no-btn"  onclick="onHelloNo()"  style="flex:1;">No, not today</button>
     </div>
-    <p class="info-p" style="font-size:0.85em;opacity:0.72;font-style:italic;margin-top:14px;">In a car (or wherever connected to Bluetooth audio) with voice control, sound will come through your phone. Without, it will come through the Bluetooth speakers. This is a limitation of web apps.</p>
     <div class="welcome-push"></div>
     <div class="launch-build-date" id="hello-build-date"></div>
   </div>
